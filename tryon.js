@@ -1,14 +1,27 @@
 const angles = ['정면', '오른쪽 앞', '오른쪽 옆', '오른쪽 뒤', '뒷면', '왼쪽 뒤', '왼쪽 옆', '왼쪽 앞'];
 const sources = { base: 'assets/tryon-base.png', long: 'assets/tryon-long.png' };
-const frontHdSources = { base: 'assets/tryon-front-base-hd.png', long: 'assets/tryon-front-long-hd.png' };
+const hdSources = Object.fromEntries(['base','long'].map(variant => [variant, Array.from({length:8},(_,frame) => frame === 0
+  ? `assets/tryon-front-${variant}-hd.png`
+  : `assets/tryon-${variant}-${String(frame*45).padStart(3,'0')}-hd.png`)]));
 const toolPaths = { texture:'M3 4h18v16H3zM3 10h18M9 4v16M15 4v16', plus:'M12 5v14M5 12h14', minus:'M5 12h14', expand:'M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4', collapse:'M4 8h4V4m8 0v4h4M8 20v-4H4m12 4v-4h4', download:'M12 3v12m-4-4 4 4 4-4M5 17v4h14v-4' };
 const toolIcon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${toolPaths[name]}"/></svg>`;
 const cached = new Map();
-function loadImage(src) {
-  if (!cached.has(src)) cached.set(src, new Promise((resolve, reject) => {
-    const img = new Image(); img.onload = () => resolve(img); img.onerror = () => { cached.delete(src); reject(new Error('착용 이미지를 불러오지 못했어요.')); }; img.src = src;
-  }));
-  return cached.get(src);
+const MAX_CANVAS_PIXELS = 16_000_000;
+const MAX_CANVAS_EDGE = 8192;
+function canvasScale(width, height) {
+  const density = Math.max(1, window.devicePixelRatio || 1);
+  return Math.min(density, MAX_CANVAS_EDGE / width, MAX_CANVAS_EDGE / height, Math.sqrt(MAX_CANVAS_PIXELS / (width * height)));
+}
+function loadImage(src, keepCached = true) {
+  if (keepCached && cached.has(src)) return cached.get(src);
+  const request = new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => { if (keepCached) cached.delete(src); reject(new Error('착용 이미지를 불러오지 못했어요.')); };
+    img.src = src;
+  });
+  if (keepCached) cached.set(src, request);
+  return request;
 }
 export function supportsTryOn(design) {
   const k=design.knit||{};
@@ -46,8 +59,25 @@ export function createTryOn(root, options) {
   const canvas = root.querySelector('canvas'), ctx = canvas.getContext('2d');
   const viewport = root.querySelector('.tryon-viewport');
   const abort = new AbortController(), signal = abort.signal;
-  let images, frontHd = {}, disposed = false, timer = null, drag = null, raf = null;
-  const frontHdRequested = new Set();
+  let images, hdFrames = {base: Array(8), long: Array(8)}, disposed = false, timer = null, drag = null, raf = null;
+  const hdRequested = new Set();
+  const detailOrder = [];
+  const MAX_DETAIL_FRAMES = 6;
+  function touchDetail(variant, frame) {
+    const key = `${variant}-${frame}`;
+    const previous = detailOrder.indexOf(key);
+    if (previous !== -1) detailOrder.splice(previous, 1);
+    detailOrder.push(key);
+    while (detailOrder.length > MAX_DETAIL_FRAMES) {
+      const active = new Set((ui.variant === 'compare' ? ['base','long'] : [ui.variant]).map(current => `${current}-${ui.frame}`));
+      const staleIndex = detailOrder.findIndex(entry => !active.has(entry));
+      if (staleIndex === -1) break;
+      const [stale] = detailOrder.splice(staleIndex, 1);
+      const [oldVariant, oldFrame] = stale.split('-');
+      hdFrames[oldVariant][Number(oldFrame)] = undefined;
+      hdRequested.delete(stale);
+    }
+  }
   const listen = (el, name, fn, options={}) => el.addEventListener(name, fn, {signal,...options});
   ui.frame = ((ui.frame || 0) % 8 + 8) % 8;
   ui.variant ||= sleeve === 52 ? 'long' : 'base';
@@ -58,11 +88,16 @@ export function createTryOn(root, options) {
   function viewBounds() {
     const width = viewport.clientWidth, height = viewport.clientHeight;
     const viewWidth = ui.variant === 'compare' ? width / 2 : width;
-    const img = images?.[ui.variant === 'long' ? 'long' : 'base'];
-    const frameWidth = img ? img.naturalWidth / 4 : 384;
-    const frameHeight = img ? img.naturalHeight / 2 : 512;
-    const fit = Math.min(viewWidth / frameWidth, height / frameHeight);
-    return {width,height,viewWidth,limitX:Math.max(0,(frameWidth*fit*zoomFactor()-viewWidth)/2),limitY:Math.max(0,(frameHeight*fit*zoomFactor()-height)/2)};
+    const variants = ui.variant === 'compare' ? ['base','long'] : [ui.variant];
+    const limits = variants.map(variant => {
+      const detail = hdFrames[variant]?.[ui.frame];
+      const img = detail || images?.[variant];
+      const frameWidth = img ? img.naturalWidth / (detail ? 1 : 4) : 384;
+      const frameHeight = img ? img.naturalHeight / (detail ? 1 : 2) : 512;
+      const fit = Math.min(viewWidth / frameWidth, height / frameHeight);
+      return {x:Math.max(0,(frameWidth*fit*zoomFactor()-viewWidth)/2),y:Math.max(0,(frameHeight*fit*zoomFactor()-height)/2)};
+    });
+    return {width,height,viewWidth,limitX:Math.min(...limits.map(limit => limit.x)),limitY:Math.min(...limits.map(limit => limit.y))};
   }
   function clampPan() {
     const {limitX,limitY} = viewBounds();
@@ -102,37 +137,50 @@ export function createTryOn(root, options) {
     ctx.drawImage(img, detail ? 0 : column*cw, detail ? 0 : row*ch, cw, ch, dx, dy, dw, dh);
     ctx.restore();
   }
-  function requestFrontHd() {
-    if (ui.frame!==0 || zoomFactor()<=1) return;
-    const variants=ui.variant==='compare' ? ['base','long'] : [ui.variant];
+  function requestFrameHd() {
+    const frame = ui.frame;
+    const variants = ui.variant === 'compare' ? ['base','long'] : [ui.variant];
     for (const variant of variants) {
-      if (frontHdRequested.has(variant)) continue;
-      frontHdRequested.add(variant);
-      loadImage(frontHdSources[variant]).then(img=>{
+      const key = `${variant}-${frame}`;
+      if (hdFrames[variant][frame]) {
+        touchDetail(variant, frame);
+        continue;
+      }
+      if (hdRequested.has(key)) continue;
+      hdRequested.add(key);
+      loadImage(hdSources[variant][frame], false).then(img => {
         if (disposed) return;
-        frontHd[variant]=img;
+        hdFrames[variant][frame] = img;
+        touchDetail(variant, frame);
         draw();
-      }).catch(()=>{}); // Keep the atlas frame visible if the HD image is unavailable.
+      }).catch(() => {}); // Keep the atlas frame visible if the individual HD image is unavailable.
     }
   }
   function draw() {
     if (disposed || !images) return;
-    requestFrontHd();
-    const {width:w,height:h} = viewport.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 3);
+    requestFrameHd();
+    const {width:w,height:h} = viewport.getBoundingClientRect();
     if (!w || !h) return;
+    const dpr = canvasScale(w, h);
     clampPan();
     const pixelWidth=Math.round(w*dpr), pixelHeight=Math.round(h*dpr);
     if(canvas.width!==pixelWidth||canvas.height!==pixelHeight){canvas.width=pixelWidth;canvas.height=pixelHeight;}
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
     ctx.fillStyle = '#f1f0ee'; ctx.fillRect(0,0,w,h);
-    const hd=ui.frame===0&&zoomFactor()>1;
+    const baseHd = hdFrames.base[ui.frame], longHd = hdFrames.long[ui.frame];
     if (ui.variant === 'compare') {
-      drawView(hd&&frontHd.base||images.base,0,0,w/2,h,Boolean(hd&&frontHd.base));
-      drawView(hd&&frontHd.long||images.long,w/2,0,w/2,h,Boolean(hd&&frontHd.long));
+      drawView(baseHd || images.base,0,0,w/2,h,Boolean(baseHd));
+      drawView(longHd || images.long,w/2,0,w/2,h,Boolean(longHd));
       ctx.fillStyle='#d8d4d0'; ctx.fillRect(Math.floor(w/2),22,1,h-44);
-    } else drawView(hd&&frontHd[ui.variant]||images[ui.variant],0,0,w,h,Boolean(hd&&frontHd[ui.variant]));
-    root.querySelector('.tryon-hd-badge').hidden=!(hd&&(ui.variant==='compare'?(frontHd.base||frontHd.long):frontHd[ui.variant]));
+    } else {
+      const hd = hdFrames[ui.variant][ui.frame];
+      drawView(hd || images[ui.variant],0,0,w,h,Boolean(hd));
+    }
+    const hasHd = ui.variant === 'compare' ? Boolean(baseHd && longHd) : Boolean(hdFrames[ui.variant][ui.frame]);
+    const badge = root.querySelector('.tryon-hd-badge');
+    badge.hidden = !hasHd;
+    if (hasHd) badge.textContent = `${angles[ui.frame]} 고화질 참고 컷`;
     canvas.setAttribute('aria-label',`${ui.variant==='compare'?'기본 소매와 긴 소매 비교':ui.variant==='long'?'손등 덮는 소매':'기본 소매'}, ${angles[ui.frame]}, ${ui.frame*45}도${zoomFactor()>1?', '+Math.round(zoomFactor()*100)+'% 확대':''}`);
   }
   function renderControls() {
@@ -262,7 +310,8 @@ export function createTryOn(root, options) {
   listen(document,'keydown',e=>{if(!root.classList.contains('tryon-expanded')||document.querySelector('#modal-root .modal'))return;if(e.key==='Escape')fullScreen();if(e.key==='Tab'){const a=[...root.querySelectorAll('button,input,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length),first=a[0],last=a.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}} });
   listen(document,'fullscreenchange',updateFullscreenButton);
   const observer=new ResizeObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(draw);});observer.observe(viewport);
+  listen(window,'resize',()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(draw);});
   renderControls();
   Promise.all([loadImage(sources.base),loadImage(sources.long)]).then(([base,long])=>{if(disposed)return;images={base,long};root.querySelector('.tryon-loading').hidden=true;renderControls();}).catch(err=>{if(!disposed)root.querySelector('.tryon-loading').textContent=err.message+' 새로고침해 주세요.';});
-  return {reset,zoom(){zoomTo(zoomFactor()>1?1:2);},save:saveImage,dispose(){disposed=true;stop();abort.abort();observer.disconnect();cancelAnimationFrame(raf);}};
+  return {reset,zoom(){zoomTo(zoomFactor()>1?1:2);},save:saveImage,dispose(){disposed=true;stop();abort.abort();observer.disconnect();cancelAnimationFrame(raf);hdFrames={base:[],long:[]};detailOrder.length=0;}};
 }

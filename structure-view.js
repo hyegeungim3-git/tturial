@@ -7,7 +7,7 @@ export function createAvatar(container,project,onSelectSleeve){
   if(!plan.valid){container.innerHTML='<div class="empty"><h3>수정 조건을 조정해 주세요</h3><p>줄임 규칙이 성립하는 조건에서 360도 형태를 만듭니다.</p></div>';return{dispose(){}};}
   const d=project.design,p=project.profile,s=plan.sleeve,h=p.height/165,materials=new Set(),geometries=new Set(),textures=new Set();
   const scene=new THREE.Scene();scene.background=new THREE.Color('#f4f2f7');
-  const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.append(renderer.domElement);
+  const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.append(renderer.domElement);
   renderer.domElement.setAttribute('aria-label',`설계 ${plan.id}, 소매 ${s.totalRows}단으로 생성한 360도 구조`);
   const camera=new THREE.PerspectiveCamera(32,1,.05,10);camera.position.set(0,1.1,3.6);camera.lookAt(0,.92,0);
   scene.add(new THREE.HemisphereLight('#ffffff','#b3a4c1',2.4));
@@ -41,7 +41,7 @@ export function createAvatar(container,project,onSelectSleeve){
     }
     ctx.putImageData(image,0,0);
     const texture=new THREE.CanvasTexture(canvas);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
-    texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+    texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
     textures.add(texture);return texture;
   }
   function textile(color,rib=false){
@@ -110,7 +110,13 @@ export function createAvatar(container,project,onSelectSleeve){
   }
   const abort=new AbortController(),signal=abort.signal;
   function setMode(value){mode=value;surfaces.forEach(m=>{m.material=value==='surface'?m.userData.surface:value==='parts'?masks[m.userData.region]:value==='normal'?normal:depth;});markers.forEach(m=>m.visible=value==='surface'&&!exporting);floor.visible=value==='surface';scene.background=new THREE.Color(value==='surface'?'#f4f2f7':'#000000');}
-  function resize(){if(exporting||disposed)return;const w=Math.max(1,container.clientWidth),ht=Math.max(1,container.clientHeight);renderer.setSize(w,ht);camera.aspect=w/ht;camera.updateProjectionMatrix();}
+  function resize(){
+    if(exporting||disposed)return;
+    const w=Math.max(1,container.clientWidth),ht=Math.max(1,container.clientHeight);
+    // Use dense display pixels and supersample low-DPI screens, capped at 5 MP.
+    const ratio=Math.max(1,Math.min(3,Math.max(2,window.devicePixelRatio||1),Math.sqrt(5000000/(w*ht)),renderer.capabilities.maxTextureSize/Math.max(w,ht)));
+    renderer.setPixelRatio(ratio);renderer.setSize(w,ht);camera.aspect=w/ht;camera.updateProjectionMatrix();
+  }
   const observer=new ResizeObserver(resize);observer.observe(container);resize();
   function draw(){if(disposed)return;if(!exporting){if(auto&&pointers.size===0)model.rotation.y+=.006;renderer.render(scene,camera);}frame=requestAnimationFrame(draw);}draw();
   container.tabIndex=0;container.style.touchAction='pan-y';
@@ -177,5 +183,15 @@ export function createAvatar(container,project,onSelectSleeve){
       return zipFiles(files);
     }finally{exporting=false;if(!disposed){renderer.setPixelRatio(previous.pixel);model.rotation.y=previous.angle;setZoom(previous.z);setMode(previous.mode);resize();renderer.render(scene,camera);}}
   }
-  return{plan,setMode,angle(deg){auto=false;model.rotation.y=deg*Math.PI/180;},toggleAuto(){auto=!auto;return auto;},zoom(){return zoomBy(1);},zoomBy,reset(){auto=false;model.rotation.y=0;setZoom(3.6);setMode('surface');},save(name){renderer.render(scene,camera);const a=document.createElement('a');a.href=renderer.domElement.toDataURL('image/png');a.download=name;a.click();},exportGuides,dispose(){disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());renderer.dispose();renderer.forceContextLoss();}};
+  function save(name){
+    if(exporting)return;
+    const w=Math.max(1,container.clientWidth),ht=Math.max(1,container.clientHeight),previousRatio=renderer.getPixelRatio();
+    const scale=Math.min(4096/Math.max(w,ht),Math.sqrt(8000000/(w*ht)));
+    try{
+      renderer.setPixelRatio(1);renderer.setSize(Math.round(w*scale),Math.round(ht*scale),false);
+      camera.aspect=w/ht;camera.updateProjectionMatrix();renderer.render(scene,camera);
+      const a=document.createElement('a');a.href=renderer.domElement.toDataURL('image/png');a.download=name;a.click();
+    }finally{renderer.setPixelRatio(previousRatio);resize();renderer.render(scene,camera);}
+  }
+  return{plan,setMode,angle(deg){auto=false;model.rotation.y=deg*Math.PI/180;},toggleAuto(){auto=!auto;return auto;},zoom(){return zoomBy(1);},zoomBy,reset(){auto=false;model.rotation.y=0;setZoom(3.6);setMode('surface');},save,exportGuides,dispose(){disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());renderer.dispose();renderer.forceContextLoss();}};
 }
