@@ -68,3 +68,26 @@
 .tryon-texture-detail-tools button:disabled{opacity:.45;cursor:default}
 .tryon-texture-detail-zoom{min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
 @media(max-width:600px){.tryon-texture-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.tryon-texture-detail-head{padding:12px}.tryon-texture-detail-head strong{font-size:15px}.tryon-texture-detail-viewport{height:min(55dvh,480px);min-height:220px}.tryon-texture-detail-tools{flex-wrap:wrap;justify-content:center;padding:9px 10px}.tryon-texture-detail-tools>span{text-align:center}.tryon-texture-detail-tools button{min-width:36px;min-height:36px}}
+
+
+/* Separate real knit garment example; the virtual try-on remains unchanged. */
+.tryon-real-knit{padding:10px;border:1px solid #dcd3e4;border-radius:9px;background:#fff}
+.tryon-real-knit-card{display:flex;align-items:center;gap:13px;width:100%;padding:0;overflow:hidden;border:1px solid #e6e0e9;border-radius:8px;background:#fcfbfd;color:#534364;text-align:left;cursor:zoom-in}
+.tryon-real-knit-card:hover{border-color:#b7a9c8;box-shadow:0 2px 10px #36224216}
+.tryon-real-knit-card img{display:block;flex:none;width:112px;height:146px;object-fit:cover;object-position:center 42%;background:#ece8e5}
+.tryon-real-knit-card span{display:block;min-width:0;padding:8px 10px 8px 0}
+.tryon-real-knit-card strong{display:block;font-size:14px;line-height:1.5}
+.tryon-real-knit-card small{display:block;margin-top:7px;color:#7a6d85;font-size:12px;line-height:1.6}
+.tryon-real-knit>p{margin:8px 1px 0;color:#766b7e;font-size:12px;line-height:1.55}
+.tryon-real-knit .tryon-real-knit-credit{color:#867a8d;font-size:11px}
+.tryon-real-knit-credit a,.tryon-texture-detail-credit a{color:#62507e;text-decoration:underline;text-underline-offset:2px}
+.tryon-real-knit-credit a:hover,.tryon-texture-detail-credit a:hover{color:#432b67}
+.tryon-ai-knit{margin-top:13px;padding-top:12px;border-top:1px solid #e5dfe9}
+.tryon-ai-knit>strong{display:block;color:#534364;font-size:13px}
+.tryon-ai-knit>p{margin:3px 0 10px;color:#7d7188;font-size:12px;line-height:1.5}
+.tryon-texture-detail-loading{position:absolute;inset:0;z-index:2;display:grid;place-items:center;padding:24px;background:#faf9fb;color:#766b7e;text-align:center;font-size:13px}
+.tryon-texture-detail-loading[hidden],.tryon-texture-detail-credit[hidden]{display:none}
+.tryon-texture-detail-credit{margin:0;padding:0 16px 12px;color:#766b7e;font-size:11px;line-height:1.6}
+.tryon-real-knit-card:focus-visible,.tryon-real-knit-credit a:focus-visible,.tryon-texture-detail-credit a:focus-visible{outline:3px solid #a494e1;outline-offset:2px}
+@media(max-width:420px){.tryon-real-knit-card img{width:96px;height:130px}.tryon-real-knit-card{gap:9px}.tryon-real-knit-card strong{font-size:13px}.tryon-real-knit-card small{font-size:11px}}
+.tryon-real-knit-card--macro{margin-top:12px}.tryon-real-knit-card--macro img{height:112px;object-position:center}
