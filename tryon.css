@@ -43,3 +43,28 @@
   .tryon-stage-top{top:-42px;left:0;right:0}
   .tryon-stage-tools{width:100%;justify-content:flex-end}
 }
+
+
+/* Inspect existing source-image pixels without changing the try-on photo. */
+.tryon-texture-card{display:block;width:100%;padding:0;text-align:left;color:inherit;cursor:zoom-in}
+.tryon-texture-card:hover{border-color:#b7a9c8;box-shadow:0 2px 10px #36224216}
+.tryon-texture-crop{display:block;width:100%}
+.tryon-texture-card:focus-visible,.tryon-texture-detail-head button:focus-visible,.tryon-texture-detail-tools button:focus-visible,.tryon-texture-detail-viewport:focus-visible{outline:3px solid #a494e1;outline-offset:2px}
+.tryon-texture-dialog{width:min(860px,calc(100vw - 24px));max-width:none;max-height:calc(100dvh - 24px);margin:auto;padding:0;overflow:auto;border:1px solid #dfd7e5;border-radius:14px;background:#fff;color:#534364;box-shadow:0 22px 70px #281a3455}
+.tryon-texture-dialog[open]{display:flex;flex-direction:column}
+.tryon-texture-dialog::backdrop{background:#241b2ba8}
+.tryon-texture-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:15px 18px}
+.tryon-texture-detail-head strong{display:block;font-size:17px}
+.tryon-texture-detail-head p{margin:4px 0 0;color:#746a7e;font-size:13px;line-height:1.5}
+.tryon-texture-detail-close{flex:none;border:1px solid #e2dcd9;border-radius:7px;background:#fff;padding:7px 12px;color:#655675;font-size:13px}
+.tryon-texture-detail-close:hover{background:#f5f2f7}
+.tryon-texture-detail-viewport{position:relative;flex:none;height:min(60dvh,580px);min-height:250px;overflow:hidden;border-top:1px solid #e9e5e9;border-bottom:1px solid #e9e5e9;background:#fff;cursor:grab;touch-action:none;outline-offset:-4px}
+.tryon-texture-detail-viewport.dragging{cursor:grabbing}
+.tryon-texture-detail-image{position:absolute;top:0;left:0;max-width:none;transform-origin:top left;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.tryon-texture-detail-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;color:#756b7d;font-size:12px}
+.tryon-texture-detail-tools>div{display:flex;align-items:center;gap:6px;flex:none}
+.tryon-texture-detail-tools button{min-width:32px;min-height:32px;padding:3px 9px;border:1px solid #e2dcd9;border-radius:7px;background:#fff;color:#655675;font-size:13px}
+.tryon-texture-detail-tools button:hover:not(:disabled){background:#f5f2f7;border-color:#b7a9c8}
+.tryon-texture-detail-tools button:disabled{opacity:.45;cursor:default}
+.tryon-texture-detail-zoom{min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
+@media(max-width:600px){.tryon-texture-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.tryon-texture-detail-head{padding:12px}.tryon-texture-detail-head strong{font-size:15px}.tryon-texture-detail-viewport{height:min(55dvh,480px);min-height:220px}.tryon-texture-detail-tools{flex-wrap:wrap;justify-content:center;padding:9px 10px}.tryon-texture-detail-tools>span{text-align:center}.tryon-texture-detail-tools button{min-width:36px;min-height:36px}}

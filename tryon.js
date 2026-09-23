@@ -3,6 +3,9 @@ const sources = { base: 'assets/tryon-base.png', long: 'assets/tryon-long.png' }
 const hdSources = Object.fromEntries(['base','long'].map(variant => [variant, Array.from({length:8},(_,frame) => frame === 0
   ? `assets/tryon-front-${variant}-hd.png`
   : `assets/tryon-${variant}-${String(frame*45).padStart(3,'0')}-hd.png`)]));
+// Enable only after both front 4K images pass visual QA and are published with this script.
+const ENABLE_FRONT_4K = false;
+const front4kSources = {base:'assets/tryon-front-base-4k.png',long:'assets/tryon-front-long-4k.png'};
 const toolPaths = { texture:'M3 4h18v16H3zM3 10h18M9 4v16M15 4v16', plus:'M12 5v14M5 12h14', minus:'M5 12h14', expand:'M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4', collapse:'M4 8h4V4m8 0v4h4M8 20v-4H4m12 4v-4h4', download:'M12 3v12m-4-4 4 4 4-4M5 17v4h14v-4' };
 const toolIcon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${toolPaths[name]}"/></svg>`;
 const cached = new Map();
@@ -43,9 +46,14 @@ export function tryOnMarkup(p, pending) {
       <span class="tryon-drag-hint">↔ 드래그해서 돌려보세요 · 휠/두 손가락으로 확대</span>
     </div>
     <section class="tryon-texture-panel" id="tryon-texture-panel" hidden aria-label="소재 조직 참고 이미지">
-      <div class="tryon-texture-head"><div><strong>소재 조직 참고</strong><p>착용 사진을 확대한 이미지가 아닌, 같은 디자인의 스웨터 단품 이미지예요.</p></div><button type="button" data-tryon="texture-close" aria-label="소재 조직 참고 닫기">닫기</button></div>
-      <div class="tryon-texture-samples"><div class="tryon-texture-card"><div class="tryon-texture-crop tryon-texture-body" role="img" aria-label="보라색 스웨터 몸판의 촘촘한 뜨개 조직"></div><span>몸판 조직</span></div><div class="tryon-texture-card"><div class="tryon-texture-crop tryon-texture-cuff" role="img" aria-label="주황색 소매 끝 시보리 뜨개 조직"></div><span>소매 끝 시보리</span></div></div>
+      <div class="tryon-texture-head"><div><strong>소재 조직 참고</strong><p>착용 사진을 확대한 이미지가 아닌, AI로 만든 같은 디자인의 스웨터 단품 참고 이미지예요. 사진을 눌러 자세히 볼 수 있어요.</p></div><button type="button" data-tryon="texture-close" aria-label="소재 조직 참고 닫기">닫기</button></div>
+      <div class="tryon-texture-samples"><button type="button" class="tryon-texture-card" data-tryon="texture-detail" data-area="body"><span class="tryon-texture-crop tryon-texture-body" aria-hidden="true"></span><span>몸판 조직 자세히 보기</span></button><button type="button" class="tryon-texture-card" data-tryon="texture-detail" data-area="cuff"><span class="tryon-texture-crop tryon-texture-cuff" aria-hidden="true"></span><span>소매 끝 시보리 자세히 보기</span></button></div>
     </section>
+    <dialog class="tryon-texture-dialog" aria-labelledby="tryon-texture-detail-title" aria-describedby="tryon-texture-detail-note">
+      <div class="tryon-texture-detail-head"><div><strong id="tryon-texture-detail-title">몸판 조직</strong><p id="tryon-texture-detail-note">착용 사진과 별개의 AI 제작 스웨터 단품 참고 이미지예요.</p></div><button type="button" class="tryon-texture-detail-close" data-tryon="texture-detail-close" aria-label="소재 조직 확대 닫기">닫기</button></div>
+      <div class="tryon-texture-detail-viewport" tabindex="0" role="region" aria-label="스웨터 단품 조직 사진. 방향키로 이동하고 더하기와 빼기로 확대할 수 있습니다."><img class="tryon-texture-detail-image" src="assets/sweater.png" alt="연보라색 스웨터 몸판과 주황색 시보리의 뜨개 조직" draggable="false"></div>
+      <div class="tryon-texture-detail-tools"><span>드래그해서 이동 · 휠·두 손가락으로 확대</span><div><button type="button" data-tryon="texture-detail-zoom-out" aria-label="소재 조직 축소">−</button><output class="tryon-texture-detail-zoom" aria-live="polite">100%</output><button type="button" data-tryon="texture-detail-zoom-in" aria-label="소재 조직 확대">＋</button><button type="button" data-tryon="texture-detail-reset">원래 보기</button></div></div>
+    </dialog>
     <div class="tryon-rotation"><button data-tryon="prev" aria-label="이전 각도">‹</button><button data-tryon="play" aria-label="자동 회전 시작" aria-pressed="false">▷</button><input type="range" min="0" max="7" step="1" value="0" aria-label="착용 이미지 회전 각도"><output class="tryon-angle" aria-live="polite">정면 · 0°</output><button data-tryon="next" aria-label="다음 각도">›</button></div>
     <div class="tryon-directions" role="group" aria-label="방향 바로 보기">${[[0,'앞'],[2,'오른쪽'],[4,'뒤'],[6,'왼쪽']].map(([n,label])=>`<button data-tryon="angle" data-angle="${n}" aria-pressed="${n===0}">${label}</button>`).join('')}<button data-tryon="reset">보기 초기화</button></div>
     <div class="tryon-selection"><div><span class="tryon-state">${pending ? '수정안 · 아직 적용 전' : compatible ? '현재 디자인' : '기본 디자인 참고 이미지'}</span><strong class="tryon-selection-title"></strong><p class="tryon-selection-description"></p></div><button class="button primary small" data-tryon="propose">이 소매로 수정안 만들기</button></div>
@@ -59,8 +67,9 @@ export function createTryOn(root, options) {
   const canvas = root.querySelector('canvas'), ctx = canvas.getContext('2d');
   const viewport = root.querySelector('.tryon-viewport');
   const abort = new AbortController(), signal = abort.signal;
-  let images, hdFrames = {base: Array(8), long: Array(8)}, disposed = false, timer = null, drag = null, raf = null;
+  let images, hdFrames = {base: Array(8), long: Array(8)}, front4kFrames = {base:null,long:null}, disposed = false, timer = null, drag = null, raf = null;
   const hdRequested = new Set();
+  const front4kRequested = new Set(), front4kLoading = new Map();
   const detailOrder = [];
   const MAX_DETAIL_FRAMES = 6;
   function touchDetail(variant, frame) {
@@ -85,12 +94,14 @@ export function createTryOn(root, options) {
   ui.panY = Number(ui.panY) || 0;
   const zoomStops = [1, 1.5, 2, 3, 4];
   const zoomFactor = () => Math.max(1, Math.min(4, ui.zoom === true ? 1.85 : Number(ui.zoom) || 1));
+  const useFront4k = () => ENABLE_FRONT_4K && ui.frame === 0 && zoomFactor() >= 2;
+  const activeDetail = variant => (useFront4k() && front4kFrames[variant]) || hdFrames[variant]?.[ui.frame];
   function viewBounds() {
     const width = viewport.clientWidth, height = viewport.clientHeight;
     const viewWidth = ui.variant === 'compare' ? width / 2 : width;
     const variants = ui.variant === 'compare' ? ['base','long'] : [ui.variant];
     const limits = variants.map(variant => {
-      const detail = hdFrames[variant]?.[ui.frame];
+      const detail = activeDetail(variant);
       const img = detail || images?.[variant];
       const frameWidth = img ? img.naturalWidth / (detail ? 1 : 4) : 384;
       const frameHeight = img ? img.naturalHeight / (detail ? 1 : 2) : 512;
@@ -156,9 +167,29 @@ export function createTryOn(root, options) {
       }).catch(() => {}); // Keep the atlas frame visible if the individual HD image is unavailable.
     }
   }
+  function requestFront4k() {
+    if (!useFront4k()) return;
+    const variants = ui.variant === 'compare' ? ['base','long'] : [ui.variant];
+    for (const variant of variants) {
+      if (front4kFrames[variant] || front4kRequested.has(variant)) continue;
+      front4kRequested.add(variant);
+      const pending = loadImage(front4kSources[variant], false);
+      front4kLoading.set(variant, pending);
+      pending.then(img => {
+        if (disposed || front4kLoading.get(variant) !== pending) return;
+        front4kLoading.delete(variant);
+        front4kFrames[variant] = img;
+        if (useFront4k() && (ui.variant === variant || ui.variant === 'compare')) draw();
+      }).catch(() => {
+        if (front4kLoading.get(variant) === pending) front4kLoading.delete(variant);
+        // Keep the HD front image and do not repeatedly request an unavailable 4K file.
+      });
+    }
+  }
   function draw() {
     if (disposed || !images) return;
     requestFrameHd();
+    requestFront4k();
     const {width:w,height:h} = viewport.getBoundingClientRect();
     if (!w || !h) return;
     const dpr = canvasScale(w, h);
@@ -168,19 +199,20 @@ export function createTryOn(root, options) {
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
     ctx.fillStyle = '#f1f0ee'; ctx.fillRect(0,0,w,h);
-    const baseHd = hdFrames.base[ui.frame], longHd = hdFrames.long[ui.frame];
+    const baseHd = activeDetail('base'), longHd = activeDetail('long');
     if (ui.variant === 'compare') {
       drawView(baseHd || images.base,0,0,w/2,h,Boolean(baseHd));
       drawView(longHd || images.long,w/2,0,w/2,h,Boolean(longHd));
       ctx.fillStyle='#d8d4d0'; ctx.fillRect(Math.floor(w/2),22,1,h-44);
     } else {
-      const hd = hdFrames[ui.variant][ui.frame];
+      const hd = activeDetail(ui.variant);
       drawView(hd || images[ui.variant],0,0,w,h,Boolean(hd));
     }
-    const hasHd = ui.variant === 'compare' ? Boolean(baseHd && longHd) : Boolean(hdFrames[ui.variant][ui.frame]);
+    const hasHd = ui.variant === 'compare' ? Boolean(baseHd && longHd) : Boolean(activeDetail(ui.variant));
     const badge = root.querySelector('.tryon-hd-badge');
     badge.hidden = !hasHd;
-    if (hasHd) badge.textContent = `${angles[ui.frame]} 고화질 참고 컷`;
+    if (hasHd && useFront4k() && (ui.variant === 'compare' ? Boolean(front4kFrames.base && front4kFrames.long) : Boolean(front4kFrames[ui.variant]))) badge.textContent = '정면 4K 참고 컷';
+    else if (hasHd) badge.textContent = `${angles[ui.frame]} 고화질 참고 컷`;
     canvas.setAttribute('aria-label',`${ui.variant==='compare'?'기본 소매와 긴 소매 비교':ui.variant==='long'?'손등 덮는 소매':'기본 소매'}, ${angles[ui.frame]}, ${ui.frame*45}도${zoomFactor()>1?', '+Math.round(zoomFactor()*100)+'% 확대':''}`);
   }
   function renderControls() {
@@ -211,6 +243,133 @@ export function createTryOn(root, options) {
   function saveImage(name='뜨리얼-착용예시.png') {if(!images)return;canvas.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});}
   function updateFullscreenButton() {const expanded=document.fullscreenElement===root||root.classList.contains('tryon-expanded'),b=root.querySelector('[data-tryon="fullscreen"]');b.setAttribute('aria-label',expanded?'크게 보기 닫기':'착용 보기 크게 열기');b.innerHTML=toolIcon(expanded?'collapse':'expand');draw();}
   function fullScreen() {const expanded=root.classList.toggle('tryon-expanded');if(expanded){root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-label','실사 착용 크게 보기');}else{root.removeAttribute('role');root.removeAttribute('aria-modal');root.removeAttribute('aria-label');}updateFullscreenButton();root.querySelector('[data-tryon="fullscreen"]').focus();}
+  const textureDialog = root.querySelector('.tryon-texture-dialog');
+  const textureViewport = root.querySelector('.tryon-texture-detail-viewport');
+  const textureImage = root.querySelector('.tryon-texture-detail-image');
+  const texturePointers = new Map();
+  const textureZoomStops = [.5, .75, 1, 1.5, 2];
+  let textureArea = 'body', textureZoom = 1, textureX = 0, textureY = 0, textureTrigger = null, textureDrag = null, texturePinch = null;
+  function clampTexturePan() {
+    if (!textureImage.naturalWidth || !textureViewport.clientWidth) return;
+    const w = textureViewport.clientWidth, h = textureViewport.clientHeight;
+    const iw = textureImage.naturalWidth * textureZoom, ih = textureImage.naturalHeight * textureZoom;
+    textureX = iw <= w ? (w - iw) / 2 : Math.max(w - iw, Math.min(0, textureX));
+    textureY = ih <= h ? (h - ih) / 2 : Math.max(h - ih, Math.min(0, textureY));
+  }
+  function renderTextureDetail() {
+    textureDialog.querySelector('.tryon-texture-detail-zoom').textContent = Math.round(textureZoom * 100) + '%';
+    textureDialog.querySelector('[data-tryon="texture-detail-zoom-out"]').disabled = textureZoom <= textureZoomStops[0] + .001;
+    textureDialog.querySelector('[data-tryon="texture-detail-zoom-in"]').disabled = textureZoom >= textureZoomStops.at(-1) - .001;
+    if (!textureImage.naturalWidth) return;
+    textureImage.style.width = textureImage.naturalWidth + 'px';
+    textureImage.style.height = textureImage.naturalHeight + 'px';
+    textureImage.style.transform = 'translate3d(' + textureX + 'px,' + textureY + 'px,0) scale(' + textureZoom + ')';
+  }
+  function resetTextureDetail() {
+    textureZoom = 1;
+    if (textureImage.naturalWidth) {
+      const focus = textureArea === 'cuff' ? {x:.11, y:.8} : {x:.5, y:.52};
+      textureX = textureViewport.clientWidth / 2 - textureImage.naturalWidth * focus.x;
+      textureY = textureViewport.clientHeight / 2 - textureImage.naturalHeight * focus.y;
+      clampTexturePan();
+    }
+    renderTextureDetail();
+  }
+  function zoomTextureDetail(value, anchorX = textureViewport.clientWidth / 2, anchorY = textureViewport.clientHeight / 2) {
+    if (!textureImage.naturalWidth) return;
+    const next = Math.max(textureZoomStops[0], Math.min(textureZoomStops.at(-1), value));
+    if (Math.abs(next - textureZoom) < .001) return;
+    const ratio = next / textureZoom;
+    textureX = anchorX - (anchorX - textureX) * ratio;
+    textureY = anchorY - (anchorY - textureY) * ratio;
+    textureZoom = next;
+    clampTexturePan();
+    renderTextureDetail();
+  }
+  function stepTextureZoom(direction) {
+    const next = direction > 0 ? textureZoomStops.find(stop => stop > textureZoom + .01) : [...textureZoomStops].reverse().find(stop => stop < textureZoom - .01);
+    if (next !== undefined) zoomTextureDetail(next);
+  }
+  function openTextureDetail(area, trigger) {
+    textureArea = area === 'cuff' ? 'cuff' : 'body';
+    textureTrigger = trigger;
+    textureDialog.querySelector('#tryon-texture-detail-title').textContent = textureArea === 'cuff' ? '소매 끝 시보리 조직' : '몸판 조직';
+    textureDialog.showModal();
+    resetTextureDetail();
+    textureViewport.focus({preventScroll:true});
+  }
+  listen(textureImage, 'load', () => { if (textureDialog.open) resetTextureDetail(); });
+  listen(textureDialog, 'close', () => {
+    texturePointers.clear();
+    textureDrag = texturePinch = null;
+    textureViewport.classList.remove('dragging');
+    if (!disposed && textureTrigger?.isConnected) textureTrigger.focus({preventScroll:true});
+  });
+  listen(textureViewport, 'pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    textureViewport.setPointerCapture(e.pointerId);
+    texturePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if (texturePointers.size === 2) {
+      const [a,b] = [...texturePointers.values()];
+      texturePinch = {distance:Math.hypot(a.x-b.x, a.y-b.y), x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+      textureDrag = null;
+    } else if (texturePointers.size === 1) textureDrag = {x:e.clientX, y:e.clientY};
+    textureViewport.classList.add('dragging');
+    textureViewport.focus({preventScroll:true});
+  });
+  listen(textureViewport, 'pointermove', e => {
+    if (!texturePointers.has(e.pointerId)) return;
+    texturePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if (texturePointers.size === 2 && texturePinch) {
+      const [a,b] = [...texturePointers.values()];
+      const distance = Math.hypot(a.x-b.x, a.y-b.y), x = (a.x+b.x)/2, y = (a.y+b.y)/2;
+      const rect = textureViewport.getBoundingClientRect();
+      if (texturePinch.distance) zoomTextureDetail(textureZoom * distance / texturePinch.distance, x - rect.left, y - rect.top);
+      textureX += x - texturePinch.x; textureY += y - texturePinch.y;
+      clampTexturePan(); renderTextureDetail();
+      texturePinch = {distance, x, y};
+    } else if (texturePointers.size === 1 && textureDrag) {
+      textureX += e.clientX - textureDrag.x; textureY += e.clientY - textureDrag.y;
+      textureDrag = {x:e.clientX, y:e.clientY};
+      clampTexturePan(); renderTextureDetail();
+    }
+  });
+  function endTexturePointer(e) {
+    texturePointers.delete(e.pointerId);
+    texturePinch = null;
+    if (texturePointers.size === 1) {
+      const point = [...texturePointers.values()][0];
+      textureDrag = {x:point.x, y:point.y};
+    } else if (!texturePointers.size) {
+      textureDrag = null;
+      textureViewport.classList.remove('dragging');
+    }
+  }
+  listen(textureViewport, 'pointerup', endTexturePointer);
+  listen(textureViewport, 'pointercancel', endTexturePointer);
+  listen(textureViewport, 'lostpointercapture', endTexturePointer);
+  listen(textureViewport, 'wheel', e => {
+    if (!textureImage.naturalWidth || !e.deltaY) return;
+    e.preventDefault();
+    const rect = textureViewport.getBoundingClientRect();
+    zoomTextureDetail(textureZoom * Math.exp(-e.deltaY * .0015), e.clientX - rect.left, e.clientY - rect.top);
+  }, {passive:false});
+  listen(textureViewport, 'keydown', e => {
+    if (e.target !== textureViewport) return;
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-','Home','0'].includes(e.key)) e.preventDefault();
+    if (e.key === 'ArrowLeft') textureX += 70;
+    if (e.key === 'ArrowRight') textureX -= 70;
+    if (e.key === 'ArrowUp') textureY += 70;
+    if (e.key === 'ArrowDown') textureY -= 70;
+    if (e.key.startsWith('Arrow')) {clampTexturePan(); renderTextureDetail();}
+    if (e.key === '+' || e.key === '=') stepTextureZoom(1);
+    if (e.key === '-') stepTextureZoom(-1);
+    if (e.key === 'Home' || e.key === '0') resetTextureDetail();
+  });
+  const textureObserver = new ResizeObserver(() => {
+    if (textureDialog.open) {clampTexturePan(); renderTextureDetail();}
+  });
+  textureObserver.observe(textureViewport);
   listen(root,'click',e=>{
     const b=e.target.closest('[data-tryon]'); if(!b) return;
     switch(b.dataset.tryon){
@@ -224,6 +383,11 @@ export function createTryOn(root, options) {
       case 'zoom-in':stepZoom(1);break;
       case 'texture':{const panel=root.querySelector('.tryon-texture-panel');panel.hidden=!panel.hidden;b.setAttribute('aria-expanded',String(!panel.hidden));break;}
       case 'texture-close':{root.querySelector('.tryon-texture-panel').hidden=true;const toggle=root.querySelector('[data-tryon="texture"]');toggle.setAttribute('aria-expanded','false');toggle.focus();break;}
+      case 'texture-detail':openTextureDetail(b.dataset.area,b);break;
+      case 'texture-detail-close':textureDialog.close();break;
+      case 'texture-detail-zoom-out':stepTextureZoom(-1);break;
+      case 'texture-detail-zoom-in':stepTextureZoom(1);break;
+      case 'texture-detail-reset':resetTextureDetail();break;
       case 'fullscreen':fullScreen();break;
       case 'save':saveImage();break;
       case 'propose':stop();onPropose(ui.variant==='base'?48:52);break;
@@ -307,11 +471,11 @@ export function createTryOn(root, options) {
     zoomTo(zoomFactor()>1?1:2,point.x,point.y);
   });
   listen(document,'visibilitychange',()=>{if(document.hidden)stop();});
-  listen(document,'keydown',e=>{if(!root.classList.contains('tryon-expanded')||document.querySelector('#modal-root .modal'))return;if(e.key==='Escape')fullScreen();if(e.key==='Tab'){const a=[...root.querySelectorAll('button,input,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length),first=a[0],last=a.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}} });
+  listen(document,'keydown',e=>{if(textureDialog.open||!root.classList.contains('tryon-expanded')||document.querySelector('#modal-root .modal'))return;if(e.key==='Escape')fullScreen();if(e.key==='Tab'){const a=[...root.querySelectorAll('button,input,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length),first=a[0],last=a.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}} });
   listen(document,'fullscreenchange',updateFullscreenButton);
   const observer=new ResizeObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(draw);});observer.observe(viewport);
   listen(window,'resize',()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(draw);});
   renderControls();
   Promise.all([loadImage(sources.base),loadImage(sources.long)]).then(([base,long])=>{if(disposed)return;images={base,long};root.querySelector('.tryon-loading').hidden=true;renderControls();}).catch(err=>{if(!disposed)root.querySelector('.tryon-loading').textContent=err.message+' 새로고침해 주세요.';});
-  return {reset,zoom(){zoomTo(zoomFactor()>1?1:2);},save:saveImage,dispose(){disposed=true;stop();abort.abort();observer.disconnect();cancelAnimationFrame(raf);hdFrames={base:[],long:[]};detailOrder.length=0;}};
+  return {reset,zoom(){zoomTo(zoomFactor()>1?1:2);},save:saveImage,dispose(){disposed=true;if(textureDialog.open)textureDialog.close();textureObserver.disconnect();stop();abort.abort();observer.disconnect();cancelAnimationFrame(raf);hdFrames={base:[],long:[]};front4kFrames={base:null,long:null};front4kLoading.clear();detailOrder.length=0;}};
 }
