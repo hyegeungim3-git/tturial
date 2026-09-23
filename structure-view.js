@@ -5,24 +5,50 @@ import {zipFiles} from './bundle.js';
 export function createAvatar(container,project,onSelectSleeve){
   const plan=compileDesign(project);
   if(!plan.valid){container.innerHTML='<div class="empty"><h3>수정 조건을 조정해 주세요</h3><p>줄임 규칙이 성립하는 조건에서 360도 형태를 만듭니다.</p></div>';return{dispose(){}};}
-  const d=project.design,p=project.profile,s=plan.sleeve,h=p.height/165,materials=new Set(),geometries=new Set();
+  const d=project.design,p=project.profile,s=plan.sleeve,h=p.height/165,materials=new Set(),geometries=new Set(),textures=new Set();
   const scene=new THREE.Scene();scene.background=new THREE.Color('#f4f2f7');
   const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.append(renderer.domElement);
   renderer.domElement.setAttribute('aria-label',`설계 ${plan.id}, 소매 ${s.totalRows}단으로 생성한 360도 구조`);
-  const camera=new THREE.PerspectiveCamera(32,1,.1,10);camera.position.set(0,1.1,3.6);camera.lookAt(0,.85,0);
+  const camera=new THREE.PerspectiveCamera(32,1,.05,10);camera.position.set(0,1.1,3.6);camera.lookAt(0,.92,0);
   scene.add(new THREE.HemisphereLight('#ffffff','#b3a4c1',2.4));
   const key=new THREE.DirectionalLight('#fff9f1',3);key.position.set(-2,4,3);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.normalBias=.006;scene.add(key);
   const fill=new THREE.DirectionalLight('#e0daff',1.8);fill.position.set(3,2,-3);scene.add(fill);
   const model=new THREE.Group();model.scale.y=h;scene.add(model);
   const mat=(color)=>{const m=new THREE.MeshStandardMaterial({color,roughness:.93});materials.add(m);return m;};
   const skin=mat('#e8ddd7'),pants=mat('#555364'),shoes=mat('#faf8f4'),plain=mat(d.color);
-  function textile(color,rib=false){const m=mat(color);m.onBeforeCompile=shader=>{
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 stitchUv;').replace('#include <uv_vertex>','#include <uv_vertex>\nstitchUv=uv;');
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec2 stitchUv;').replace('#include <color_fragment>',`#include <color_fragment>
-      vec2 cell=fract(stitchUv); float ridge=abs(cell.x-.5)*1.5; float yarn=sin((cell.y-ridge)*6.28318); float ribShadow=${rib?'mod(floor(stitchUv.x),4.0)<2.0?1.0:.80':'1.0'};
-      diffuseColor.rgb *= (.92+.08*yarn)*ribShadow;`);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_begin>','#include <normal_fragment_begin>\nnormal=normalize(normal+vec3(cos(stitchUv.x*6.28318)*.09,sin(stitchUv.y*6.28318)*.05,0.0));');
-  };m.customProgramCacheKey=()=>`knit-${rib}`;return m;}
+  // Each UV unit is one calculated stitch/row. Mipmaps keep distant fabric calm,
+  // while the woven relief becomes visible only when the camera is close enough.
+  function knitTexture(rib=false){
+    const size=128,canvas=document.createElement('canvas');canvas.width=canvas.height=size;
+    const ctx=canvas.getContext('2d'),image=ctx.createImageData(size,size);
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+      const u=(x+.5)/size,v=(y+.5)/size;
+      let ridge,groove;
+      if(rib){
+        ridge=Math.exp(-Math.pow((u-.5)/.24,4));
+        groove=Math.exp(-Math.pow((u-.08)/.09,2))+Math.exp(-Math.pow((u-.92)/.09,2));
+      }else{
+        const curve=.17+.31*v+.018*Math.sin(Math.PI*v);
+        const distance=Math.min(Math.abs(u-curve),Math.abs(u-(1-curve)));
+        const rowFade=Math.min(1,v*14,(1-v)*14);
+        ridge=Math.exp(-Math.pow(distance/.088,2))*rowFade;
+        groove=Math.exp(-Math.pow((distance-.14)/.05,2))*rowFade;
+      }
+      const fibre=(Math.sin(v*116+u*25)+Math.sin(v*241-u*37))*.008;
+      const shade=Math.max(.78,Math.min(1,.93+.07*ridge-.08*groove+fibre));
+      const i=(y*size+x)*4,value=Math.round(shade*255);
+      image.data[i]=image.data[i+1]=image.data[i+2]=value;image.data[i+3]=255;
+    }
+    ctx.putImageData(image,0,0);
+    const texture=new THREE.CanvasTexture(canvas);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+    texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+    textures.add(texture);return texture;
+  }
+  function textile(color,rib=false){
+    const m=mat(color),texture=knitTexture(rib);
+    m.map=texture;m.bumpMap=texture;m.bumpScale=rib?.0015:.0018;
+    return m;
+  }
   const garment=textile(d.color),rib=textile(d.trim,true);
   const surfaces=[],sleeves=[],markers=[];
   const ids={body:'#b28af4','sleeve-left':'#69bbbd','sleeve-right':'#77a2ed',cuff:'#ed9d59',collar:'#edcf6c',human:'#526172'};
@@ -68,24 +94,77 @@ export function createAvatar(container,project,onSelectSleeve){
     const path=new THREE.CatmullRomCurve3([new THREE.Vector3(side*.074,1.37,.055),new THREE.Vector3(side*bust*.65,1.285,.10),new THREE.Vector3(side*bust*.93,1.19,.052)]);
     mesh(new THREE.TubeGeometry(path,28,.0017,6,false),plain,model,'body');
   }
-  let mode='surface',disposed=false,frame,auto=false,drag=null,exporting=false;
+  let mode='surface',disposed=false,frame,auto=false,drag=null,exporting=false,zoomDistance=3.6,pinchDistance=0;
+  const pointers=new Map();
+  function setZoom(distance){
+    zoomDistance=Math.max(.68,Math.min(3.6,distance));
+    camera.position.z=zoomDistance;
+    const progress=(3.6-zoomDistance)/(3.6-.68);
+    camera.lookAt(0,.92+.2*progress,0);
+    return zoomDistance;
+  }
+  function zoomBy(direction){return setZoom(zoomDistance*Math.pow(.72,direction));}
+  function pointerSpan(){
+    const [a,b]=[...pointers.values()];
+    return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0;
+  }
   const abort=new AbortController(),signal=abort.signal;
   function setMode(value){mode=value;surfaces.forEach(m=>{m.material=value==='surface'?m.userData.surface:value==='parts'?masks[m.userData.region]:value==='normal'?normal:depth;});markers.forEach(m=>m.visible=value==='surface'&&!exporting);floor.visible=value==='surface';scene.background=new THREE.Color(value==='surface'?'#f4f2f7':'#000000');}
   function resize(){if(exporting||disposed)return;const w=Math.max(1,container.clientWidth),ht=Math.max(1,container.clientHeight);renderer.setSize(w,ht);camera.aspect=w/ht;camera.updateProjectionMatrix();}
   const observer=new ResizeObserver(resize);observer.observe(container);resize();
-  function draw(){if(disposed)return;if(!exporting){if(auto&&!drag)model.rotation.y+=.006;renderer.render(scene,camera);}frame=requestAnimationFrame(draw);}draw();
+  function draw(){if(disposed)return;if(!exporting){if(auto&&pointers.size===0)model.rotation.y+=.006;renderer.render(scene,camera);}frame=requestAnimationFrame(draw);}draw();
   container.tabIndex=0;container.style.touchAction='pan-y';
-  container.addEventListener('pointerdown',e=>{if(e.button>0||exporting)return;drag={x:e.clientX,start:e.clientX,y:e.clientY};container.setPointerCapture(e.pointerId);container.focus({preventScroll:true});},{signal});
-  container.addEventListener('pointermove',e=>{if(!drag)return;model.rotation.y+=(e.clientX-drag.x)*.012;drag.x=e.clientX;},{signal});
-  container.addEventListener('pointerup',e=>{if(!drag)return;const click=Math.abs(e.clientX-drag.start)+Math.abs(e.clientY-drag.y)<5;drag=null;if(click){const b=container.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1),camera);if(ray.intersectObjects(sleeves).length)onSelectSleeve();}},{signal});
-  container.addEventListener('pointercancel',()=>drag=null,{signal});container.addEventListener('lostpointercapture',()=>drag=null,{signal});
-  container.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();model.rotation.y+=e.key==='ArrowLeft'?-.15:.15;}},{signal});
+  container.addEventListener('pointerdown',e=>{
+    if(exporting||(e.pointerType!=='touch'&&e.button>0))return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    container.setPointerCapture(e.pointerId);container.focus({preventScroll:true});
+    if(pointers.size===1)drag={id:e.pointerId,x:e.clientX,start:e.clientX,y:e.clientY};
+    else{drag=null;pinchDistance=pointerSpan();}
+  },{signal});
+  container.addEventListener('pointermove',e=>{
+    if(!pointers.has(e.pointerId))return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size>=2){
+      const span=pointerSpan();
+      if(pinchDistance&&span)setZoom(zoomDistance*pinchDistance/span);
+      pinchDistance=span;
+    }else if(drag?.id===e.pointerId){
+      model.rotation.y+=(e.clientX-drag.x)*.012;drag.x=e.clientX;
+    }
+  },{signal});
+  function finishPointer(e){
+    if(!pointers.has(e.pointerId))return;
+    const click=pointers.size===1&&drag?.id===e.pointerId&&Math.abs(e.clientX-drag.start)+Math.abs(e.clientY-drag.y)<5;
+    pointers.delete(e.pointerId);pinchDistance=0;
+    if(pointers.size===1){
+      const [id,point]=pointers.entries().next().value;
+      drag={id,x:point.x,start:point.x,y:point.y};
+    }else drag=null;
+    if(click&&e.type==='pointerup'){
+      const b=container.getBoundingClientRect(),ray=new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1),camera);
+      if(ray.intersectObjects(sleeves).length)onSelectSleeve();
+    }
+  }
+  container.addEventListener('pointerup',finishPointer,{signal});
+  container.addEventListener('pointercancel',finishPointer,{signal});
+  container.addEventListener('lostpointercapture',finishPointer,{signal});
+  container.addEventListener('wheel',e=>{
+    if(exporting)return;
+    if((e.deltaY<0&&zoomDistance<=.68)||(e.deltaY>0&&zoomDistance>=3.6))return;
+    e.preventDefault();
+    setZoom(zoomDistance*Math.exp(e.deltaY*.0015));
+  },{passive:false,signal});
+  container.addEventListener('keydown',e=>{
+    if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();model.rotation.y+=e.key==='ArrowLeft'?-.15:.15;}
+    if(['+','=','Add','-','_','Subtract'].includes(e.key)){e.preventDefault();zoomBy(['+','=','Add'].includes(e.key)?1:-1);}
+  },{signal});
   const png=()=>new Promise(resolve=>renderer.domElement.toBlob(resolve,'image/png'));
   async function exportGuides(){
     if(exporting)throw new Error('이미 가이드를 저장하고 있어요.');exporting=true;
     const previous={mode,angle:model.rotation.y,z:camera.position.z,pixel:renderer.getPixelRatio()},files=[];
     try{
-      renderer.setPixelRatio(1);renderer.setSize(512,768,false);camera.aspect=512/768;camera.position.z=3.6;camera.updateProjectionMatrix();
+      renderer.setPixelRatio(1);renderer.setSize(512,768,false);camera.aspect=512/768;setZoom(3.6);camera.updateProjectionMatrix();
       const manifest={designId:plan.id,engine:plan.engine,width:512,height:768,views:[],partPalette:ids,depthEncoding:{space:'camera view z, metres',near:.1,far:5,formula:'intensity=1-clamp((z-near)/(far-near),0,1)',background:0},normalEncoding:'view-space XYZ mapped from [-1,1] to [0,1] by Three.js MeshNormalMaterial; display encoded sRGB',scope:'Geometry and conditioning assets only. No image-generation inference, identity preservation, image fidelity verification or fit validation has run.'};
       for(let n=0;n<8;n++){
         if(disposed)throw new Error('다른 화면으로 이동해 저장을 중단했어요.');
@@ -96,7 +175,7 @@ export function createAvatar(container,project,onSelectSleeve){
       }
       files.push({name:'design.json',data:JSON.stringify(plan,null,2)},{name:'manifest.json',data:JSON.stringify(manifest,null,2)},{name:'sleeve-rounds.csv',data:'round,section,before,after,operation\n'+s.rounds.map(r=>[r.round,r.section,r.before,r.after,r.operation].join(',')).join('\n')},{name:'README.txt',data:`Knit real ${plan.id}\n8 camera views x 4 passes from the same compiled design.\nUse parts/depth/normal maps to condition a future image generation pipeline; never treat these assets as generated photoreal try-on or validated fit.\nThe body and yoke are template geometry; only the post-underarm sleeve schedule is compiled course by course.\nTo evaluate an AI result, segment its garment parts, compare projected boundaries to these masks, check reference identity and colors, and reject mismatches. Stitch topology cannot be proven from a photoreal picture alone.\n`});
       return zipFiles(files);
-    }finally{exporting=false;if(!disposed){renderer.setPixelRatio(previous.pixel);model.rotation.y=previous.angle;camera.position.z=previous.z;setMode(previous.mode);resize();renderer.render(scene,camera);}}
+    }finally{exporting=false;if(!disposed){renderer.setPixelRatio(previous.pixel);model.rotation.y=previous.angle;setZoom(previous.z);setMode(previous.mode);resize();renderer.render(scene,camera);}}
   }
-  return{plan,setMode,angle(deg){auto=false;model.rotation.y=deg*Math.PI/180;},toggleAuto(){auto=!auto;return auto;},zoom(){camera.position.z=camera.position.z>3?2.35:3.6;},reset(){auto=false;model.rotation.y=0;camera.position.z=3.6;setMode('surface');},save(name){renderer.render(scene,camera);const a=document.createElement('a');a.href=renderer.domElement.toDataURL('image/png');a.download=name;a.click();},exportGuides,dispose(){disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.forceContextLoss();}};
+  return{plan,setMode,angle(deg){auto=false;model.rotation.y=deg*Math.PI/180;},toggleAuto(){auto=!auto;return auto;},zoom(){return zoomBy(1);},zoomBy,reset(){auto=false;model.rotation.y=0;setZoom(3.6);setMode('surface');},save(name){renderer.render(scene,camera);const a=document.createElement('a');a.href=renderer.domElement.toDataURL('image/png');a.download=name;a.click();},exportGuides,dispose(){disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());renderer.dispose();renderer.forceContextLoss();}};
 }

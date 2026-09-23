@@ -5,3 +5,41 @@
 @media(max-width:1150px){.workspace:has(.tryon-viewer){grid-template-columns:minmax(310px,.9fr) minmax(340px,1.1fr)}.tryon-viewer{padding:15px 13px 0}.preview-panel>.panel-head{padding:15px 13px}.tryon-intro h3{font-size:16px}.tryon-selection{flex-wrap:wrap;gap:7px}.tryon-selection .button{max-width:none;margin-left:auto}.tryon-viewport{height:390px}.tryon-ai{font-size:13px}.tryon-intro{gap:6px}}
 @media(max-width:920px){.workspace:has(.tryon-viewer){grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)}}
 @media(max-width:760px){.workspace:has(.tryon-viewer){grid-template-columns:minmax(0,1fr)}.preview-panel:has(.tryon-viewer){min-height:0;height:auto}.workspace:has(.tryon-viewer) .chat-panel{height:570px}.preview-panel>.panel-head{gap:10px;align-items:center}.preview-panel .segmented button{font-size:13px;padding:6px 7px}.tryon-viewer{padding:16px 13px 0}.tryon-viewport{height:390px}.tryon-selection{flex-wrap:nowrap}.tryon-selection .button{max-width:115px;margin-left:0}.tryon-options button{font-size:13px}.tryon-disclosure{font-size:13px}.tryon-intro h3{font-size:16px}.tryon-directions{gap:2px}.tryon-angle{min-width:91px}.tryon-look-label{display:none}}
+
+
+/* Interactive inspection controls and clearly labelled high-resolution material reference. */
+.tryon-viewport{touch-action:pan-y}
+.tryon-viewport.is-zoomed{cursor:move;touch-action:none}
+.tryon-viewport.dragging:not(.is-zoomed){touch-action:pan-y}
+.tryon-viewport.dragging{cursor:grabbing}
+.tryon-stage-tools{align-items:center;flex-wrap:nowrap}
+.tryon-stage-tools .tryon-zoom:disabled{opacity:.45;cursor:default}
+.tryon-zoom-level{display:inline-flex;align-items:center;justify-content:center;min-width:43px;height:30px;padding:0 4px;border-radius:7px;background:#ffffffed;color:#655675;font-size:12px;font-variant-numeric:tabular-nums}
+.tryon-texture-toggle{height:32px;padding:0 9px;border:1px solid #e2dcd9;background:#ffffffed;border-radius:8px;color:#655675;font-size:12px;font-weight:600;white-space:nowrap}
+.tryon-texture-toggle:hover,.tryon-texture-toggle[aria-expanded=true]{background:#fff;border-color:#c9bfd1;color:var(--purple)}
+.tryon-texture-panel{margin:10px 0 0;padding:12px;border:1px solid #e5dfe9;border-radius:10px;background:#faf9fb}
+.tryon-texture-panel[hidden]{display:none}
+.tryon-texture-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.tryon-texture-head strong{display:block;color:#534364;font-size:13px}
+.tryon-texture-head p{margin:3px 0 0;color:#7d7188;font-size:12px;line-height:1.5}
+.tryon-texture-head button{flex:none;padding:3px 7px;border-radius:5px;color:#796c84;font-size:12px}
+.tryon-texture-head button:hover{background:#eee9f1}
+.tryon-texture-samples{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tryon-texture-card{min-width:0;overflow:hidden;border:1px solid #e6e0e9;border-radius:8px;background:#fff}
+.tryon-texture-crop{height:160px;background-image:url('assets/sweater.png');background-repeat:no-repeat;background-size:1254px 1254px}
+.tryon-texture-body{background-position:center 48%}
+.tryon-texture-cuff{background-position:0 84%}
+.tryon-texture-card span{display:block;padding:6px 9px;color:#655675;font-size:12px;font-weight:600}
+.tryon-stage-tools .tryon-zoom:focus-visible,.tryon-texture-toggle:focus-visible,.tryon-texture-head button:focus-visible{outline:3px solid #a494e1;outline-offset:2px}
+@media(max-width:420px){.tryon-stage-top{right:8px;left:8px}.tryon-stage-tools{gap:3px}.tryon-stage-tools .tryon-zoom{width:28px;min-width:28px;height:28px}.tryon-stage-tools .tryon-zoom svg{width:16px;height:16px}.tryon-zoom-level{min-width:38px;font-size:11px}.tryon-texture-toggle{height:28px;padding:0 6px;font-size:11px}.tryon-drag-hint{max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis}}
+
+.tryon-hd-badge{position:absolute;top:52px;left:13px;z-index:1;padding:5px 8px;border-radius:5px;background:#3c2b4ac9;color:#fff;font-size:11px;letter-spacing:.1px;pointer-events:none}
+.tryon-hd-badge[hidden]{display:none}
+@media(max-width:760px){.tryon-hd-badge{top:12px;left:12px}}
+
+@media(max-width:760px){
+  .tryon-viewport{margin-top:48px;overflow:visible}
+  .tryon-canvas{border-radius:10px}
+  .tryon-stage-top{top:-42px;left:0;right:0}
+  .tryon-stage-tools{width:100%;justify-content:flex-end}
+}
