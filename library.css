@@ -3,3 +3,16 @@
 .library-project-conditions .button{max-width:100%;white-space:normal;text-align:left;overflow-wrap:anywhere}.library-project-conditions .button svg{flex-shrink:0}
 
 .backup-actions{flex-wrap:wrap;gap:10px}.modal:has(#backup-file) .modal-description,.modal:has(#backup-error) .callout{overflow-wrap:anywhere}#backup-file{max-width:100%;min-width:0}
+
+.library-swatch-card{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:12px;margin:0 0 16px;padding:8px;background:#faf8fc;border-radius:9px;color:#766487;font-size:13px}
+.library-swatch-card img{width:76px;height:76px;object-fit:cover;border-radius:7px}
+.library-swatch-editor .field{margin:14px 0}
+.library-swatch-editor input[type=file]{width:100%;max-width:100%;padding:10px;background:#fff}
+.library-swatch-preview{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:54px;padding:10px;border:1px dashed #d8cbe5;border-radius:9px;background:#fff}
+.library-swatch-preview img{width:120px;height:120px;object-fit:cover;border-radius:7px}
+.library-swatch-preview span{font-size:13px;color:#695678}
+.library-swatch-preview p{margin:0;font-size:13px}
+.library-swatch-preview .button{margin-left:auto}
+.library-swatch-hint{font-size:12px!important;margin:10px 0 0}
+#lib-swatch-status{min-height:1.5em;margin:8px 0 0;overflow-wrap:anywhere}
+@media(max-width:600px){.library-swatch-preview img{width:100px;height:100px}.library-swatch-preview .button{margin-left:0}}

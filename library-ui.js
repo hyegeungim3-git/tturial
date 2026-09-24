@@ -1,10 +1,47 @@
-import {activeGaugeStage, GAUGE_STAGES, activeRecords, saveRecord, setDefault, archiveRecord, matchesProject, prepareSelection, applySelection} from './saved-library.js';
+import {activeGaugeStage, GAUGE_STAGES, activeRecords, saveRecord, setDefault, archiveRecord, matchesProject, prepareSelection, applySelection, validSwatchPhoto} from './saved-library.js?v=20260924c';
 
 import {createProfilePreview} from './profile-preview-ui.js';
-import {gaugeCard,gaugeEditor,readGaugeForm,updateGaugeComparison} from './gauge-library-ui.js';
+import {gaugeCard,gaugeEditor,readGaugeForm,updateGaugeComparison} from './gauge-library-ui.js?v=20260924c';
+
+const SWATCH_INPUT_LIMIT = 12 * 1024 * 1024;
+const SWATCH_TYPES = new Set(['image/jpeg','image/png','image/webp']);
+
+export function validateSwatchUpload(file) {
+  if (!file || !SWATCH_TYPES.has(file.type)) throw new Error('편물 사진은 JPG, PNG 또는 WebP 파일을 선택해 주세요.');
+  if (!Number.isFinite(file.size) || file.size < 1 || file.size > SWATCH_INPUT_LIMIT) throw new Error('편물 사진은 12MB 이하 파일을 선택해 주세요.');
+}
+
+export async function compressSwatchPhoto(file) {
+  validateSwatchUpload(file);
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+  try {
+    await new Promise((resolve,reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('사진을 열 수 없어요. 다른 파일을 선택해 주세요.'));
+      image.src = url;
+    });
+    if (!image.naturalWidth || !image.naturalHeight || image.naturalWidth * image.naturalHeight > 64000000) throw new Error('사진 크기를 처리할 수 없어요. 다른 파일을 선택해 주세요.');
+    const canvas = document.createElement('canvas'), context = canvas.getContext('2d');
+    if (!context) throw new Error('이 브라우저에서는 사진을 처리할 수 없어요.');
+    for (const maxSide of [1400,1200,1000,800]) {
+      const scale = Math.min(1,maxSide / Math.max(image.naturalWidth,image.naturalHeight));
+      canvas.width = Math.max(1,Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1,Math.round(image.naturalHeight * scale));
+      context.fillStyle = '#fff';
+      context.fillRect(0,0,canvas.width,canvas.height);
+      context.drawImage(image,0,0,canvas.width,canvas.height);
+      for (const quality of [.88,.78,.68,.56]) {
+        const data = canvas.toDataURL('image/jpeg',quality);
+        if (validSwatchPhoto(data)) return data;
+      }
+    }
+    throw new Error('사진을 저장 가능한 크기로 줄이지 못했어요. 다른 사진을 선택해 주세요.');
+  } finally { URL.revokeObjectURL(url); }
+}
 
 export function createLibraryUI({getState, project, save, modal, closeModal, render, toast, afterApply, esc, ico}) {
-  let kind = 'profiles', editingId = null, showArchived = false, viewedProfileId = null;
+  let kind = 'profiles', editingId = null, showArchived = false, viewedProfileId = null, editorSwatchPhoto = '', processingSwatch = false, swatchRequest = 0;
   const profilePreview=createProfilePreview(esc);
   const title = () => kind === 'profiles' ? '치수 · 아바타 보관함' : '재료 · 게이지 보관함';
   const ref = () => kind === 'profiles' ? 'profilePresetId' : 'materialPresetId';
@@ -14,9 +51,17 @@ export function createLibraryUI({getState, project, save, modal, closeModal, ren
   const field = (label, name, value, extra = '') => `<label class="field" for="lib-${name}">${label}<input id="lib-${name}" name="${name}" value="${esc(value)}" ${extra}></label>`;
   const number = (label, name, value, min, max, step = '.1') => field(label, name, value, `type="number" min="${min}" max="${max}" step="${step}" required inputmode="decimal"`);
   const badge = (text, cls = '') => `<span class="library-badge ${cls}">${text}</span>`;
+  const swatchPreview = photo => validSwatchPhoto(photo)
+    ? `<img src="${esc(photo)}" alt="사용자가 촬영한 실제 편물 견본 사진"><span>직접 올린 실물 편물 사진</span>${button('swatch-remove','사진 제거','','button small soft')}`
+    : '<p>등록한 실물 편물 사진이 없어요.</p>';
+  function updateSwatchPreview() {
+    const preview = document.getElementById('lib-swatch-preview');
+    if (preview) preview.innerHTML = swatchPreview(editorSwatchPhoto);
+  }
+  const swatchEditor = () => `<div class="library-form-section library-swatch-editor"><h3>실물 편물 사진 (선택)</h3><p>이 실과 바늘로 직접 뜬 견본 사진을 올려주세요. 실제 조직을 비교하는 참고 사진이며, 코·단 게이지는 위에 입력한 수치로 계산해요.</p><label class="field" for="lib-swatch-file">사진 선택 · JPG, PNG, WebP · 원본 12MB 이하<input id="lib-swatch-file" type="file" accept="image/jpeg,image/png,image/webp"></label><div class="library-swatch-preview" id="lib-swatch-preview">${swatchPreview(editorSwatchPhoto)}</div><p class="library-swatch-hint">사진은 이 브라우저에서 긴 변 1400px·약 240KB 이하 JPEG로 줄여 작품 기록에 저장돼요. 작업 기록 파일에도 포함됩니다.</p><p class="error-text" id="lib-swatch-status" role="status"></p></div>`;
   const details = r => kind === 'profiles'
     ? `<dl class="library-metrics">${[['키',r.height],['가슴둘레',r.chest],['팔 길이',r.arm],['어깨너비',r.shoulder]].map(([label,value]) => `<div><dt>${label}</dt><dd>${value}<small> cm</small></dd></div>`).join('')}</dl>`
-    : `<div class="library-yarn"><strong>${esc(r.material)}</strong><span>${esc([r.brand,r.colorLabel,r.lot ? '로트 '+r.lot : ''].filter(Boolean).join(' · ') || '메리야스뜨기')}</span></div>${gaugeCard(r)}`;
+    : `<div class="library-yarn"><strong>${esc(r.material)}</strong><span>${esc([r.brand,r.colorLabel,r.lot ? '로트 '+r.lot : ''].filter(Boolean).join(' · ') || '메리야스뜨기')}</span></div>${gaugeCard(r)}${validSwatchPhoto(r.swatchPhoto) ? `<div class="library-swatch-card"><img src="${esc(r.swatchPhoto)}" alt="사용자가 올린 실제 편물 견본 사진"><span>직접 올린 실물 편물 사진</span></div>` : ''}`;
 
   function open(nextKind = kind) {
     kind = nextKind;
@@ -40,11 +85,38 @@ export function createLibraryUI({getState, project, save, modal, closeModal, ren
     const p = project();
     const r = recordId ? records().find(r => r.id === recordId) : kind === 'profiles'
       ? {...p.profile, name:'', note:''}
-      : {...p.gauge, ...p.materialInfo, needle:p.design.needle, material:p.design.material, name:'', brand:'',colorLabel:'',lot:'',note:''};
+      : {...p.gauge, ...p.materialInfo, needle:p.design.needle, material:p.design.material, name:'', brand:'',colorLabel:'',lot:'',note:'',swatchPhoto:''};
     if (!r) return;
     const isProfile = kind === 'profiles';
-    modal(`${isProfile ? '착용자' : '재료·게이지'} ${editingId ? '수정' : '등록'}`, `<p class="modal-description">${isProfile ? '옷을 입을 사람의 신체 치수를 입력해주세요. 여유분은 작품에서 따로 정해요.' : '실과 바늘을 한 묶음으로 저장해요. 같은 실도 바늘이나 손땀이 다르면 따로 등록할 수 있어요.'}</p><form id="library-form">${isProfile?'<div class="profile-editor-layout"><div>':''}${field(isProfile ? '착용자 이름' : '재료 이름','name',r.name,`required maxlength="40" placeholder="${isProfile ? '예: 나 · 기본 치수, 엄마' : '예: 봄 카디건용 메리노 · 4.5mm'}"`)}${isProfile ? `<div class="fields">${number('키 (cm)','height',r.height,100,220)}${number('가슴둘레 (cm)','chest',r.chest,50,160)}${number('팔 길이 (cm)','arm',r.arm,30,80)}${number('어깨너비 (cm)','shoulder',r.shoulder,25,65)}</div>` : `<div class="fields">${field('실 소재','material',r.material,'required maxlength="80" placeholder="예: 메리노 울 100%"')}${field('브랜드 · 제품명 (선택)','brand',r.brand,'maxlength="80"')}${field('색상명 · 색상 번호 (선택)','colorLabel',r.colorLabel,'maxlength="80"')}${field('염색 로트 (선택)','lot',r.lot,'maxlength="80"')}</div>${number('대바늘 굵기 (mm)','needle',r.needle,1,15,'.25')}${gaugeEditor(r,esc)}`}<label class="field" for="lib-note">기억해둘 내용 (선택)<textarea id="lib-note" name="note" maxlength="500" placeholder="${isProfile ? '예: 편안한 품을 좋아하고 소매는 조금 길게' : '예: 세탁 후 단 게이지가 달라져 다시 측정함'}">${esc(r.note || '')}</textarea></label>${isProfile?'</div>'+profilePreview.markup(r,true)+'</div>':''}<p class="library-footnote">저장만 하면 보관함에 담겨요. 현재 작품에 적용하기 전에는 바뀌는 조건을 한 번 더 보여드려요.</p><p class="error-text" id="library-error" role="alert"></p><div class="modal-actions library-form-actions">${button('back','목록으로')}<button type="submit" name="intent" value="save" class="button">보관함에 저장</button><button type="submit" name="intent" value="apply" class="button primary">저장하고 적용 확인</button></div></form>`, '', true);
+    editorSwatchPhoto = !isProfile && validSwatchPhoto(r.swatchPhoto) ? r.swatchPhoto : '';
+    processingSwatch = false;
+    swatchRequest += 1;
+    modal(`${isProfile ? '착용자' : '재료·게이지'} ${editingId ? '수정' : '등록'}`, `<p class="modal-description">${isProfile ? '옷을 입을 사람의 신체 치수를 입력해주세요. 여유분은 작품에서 따로 정해요.' : '실과 바늘을 한 묶음으로 저장해요. 같은 실도 바늘이나 손땀이 다르면 따로 등록할 수 있어요.'}</p><form id="library-form">${isProfile?'<div class="profile-editor-layout"><div>':''}${field(isProfile ? '착용자 이름' : '재료 이름','name',r.name,`required maxlength="40" placeholder="${isProfile ? '예: 나 · 기본 치수, 엄마' : '예: 봄 카디건용 메리노 · 4.5mm'}"`)}${isProfile ? `<div class="fields">${number('키 (cm)','height',r.height,100,220)}${number('가슴둘레 (cm)','chest',r.chest,50,160)}${number('팔 길이 (cm)','arm',r.arm,30,80)}${number('어깨너비 (cm)','shoulder',r.shoulder,25,65)}</div>` : `<div class="fields">${field('실 소재','material',r.material,'required maxlength="80" placeholder="예: 메리노 울 100%"')}${field('브랜드 · 제품명 (선택)','brand',r.brand,'maxlength="80"')}${field('색상명 · 색상 번호 (선택)','colorLabel',r.colorLabel,'maxlength="80"')}${field('염색 로트 (선택)','lot',r.lot,'maxlength="80"')}</div>${number('대바늘 굵기 (mm)','needle',r.needle,1,15,'.25')}${gaugeEditor(r,esc)}${swatchEditor()}`}<label class="field" for="lib-note">기억해둘 내용 (선택)<textarea id="lib-note" name="note" maxlength="500" placeholder="${isProfile ? '예: 편안한 품을 좋아하고 소매는 조금 길게' : '예: 세탁 후 단 게이지가 달라져 다시 측정함'}">${esc(r.note || '')}</textarea></label>${isProfile?'</div>'+profilePreview.markup(r,true)+'</div>':''}<p class="library-footnote">저장만 하면 보관함에 담겨요. 현재 작품에 적용하기 전에는 바뀌는 조건을 한 번 더 보여드려요.</p><p class="error-text" id="library-error" role="alert"></p><div class="modal-actions library-form-actions">${button('back','목록으로')}<button type="submit" name="intent" value="save" class="button">보관함에 저장</button><button type="submit" name="intent" value="apply" class="button primary">저장하고 적용 확인</button></div></form>`, '', true);
     if(isProfile){document.querySelector('#modal-root .modal').classList.add('profile-editor-modal');profilePreview.mount(r);}
+    else {
+      const form = document.getElementById('library-form'), fileInput = document.getElementById('lib-swatch-file');
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0], status = document.getElementById('lib-swatch-status');
+        if (!file || processingSwatch) return;
+        processingSwatch = true;
+        const request = ++swatchRequest;
+        form.querySelectorAll('[type="submit"]').forEach(button => {button.disabled = true;});
+        if (status) status.textContent = '사진을 줄이고 있어요…';
+        try {
+          const photo = await compressSwatchPhoto(file);
+          if (document.getElementById('library-form') !== form || request !== swatchRequest) return;
+          editorSwatchPhoto = photo;
+          updateSwatchPreview();
+          if (status) status.textContent = '사진을 준비했어요. 재료를 저장하면 기록에 포함돼요.';
+        } catch (error) {
+          if (document.getElementById('library-form') === form && request === swatchRequest && status) status.textContent = error.message;
+        } finally {
+          if (request === swatchRequest) processingSwatch = false;
+          fileInput.value = '';
+          if (document.getElementById('library-form') === form && request === swatchRequest) form.querySelectorAll('[type="submit"]').forEach(button => {button.disabled = false;});
+        }
+      });
+    }
     document.getElementById('lib-name')?.focus();
   }
 
@@ -55,7 +127,12 @@ export function createLibraryUI({getState, project, save, modal, closeModal, ren
     const rows = kind === 'profiles'
       ? [['착용자',p.profile.name,r.name], ...[['키','height'],['가슴둘레','chest'],['팔 길이','arm'],['어깨너비','shoulder']].map(([label,k]) => [label,p.profile[k]+'cm',r[k]+'cm'])]
       : [['소재',p.design.material,r.material],['대바늘',p.design.needle+'mm',r.needle+'mm'],['10cm 게이지',`${p.gauge.stitches}코 × ${p.gauge.rows}단`,`${r.stitches}코 × ${r.rows}단`]];
-    if(kind==='materials')rows.push(['계산 기준',GAUGE_STAGES[activeGaugeStage({...p.gauge,...p.materialInfo})],GAUGE_STAGES[activeGaugeStage(r)]]);
+    if(kind==='materials') {
+      rows.push(['계산 기준',GAUGE_STAGES[activeGaugeStage({...p.gauge,...p.materialInfo})],GAUGE_STAGES[activeGaugeStage(r)]]);
+      const currentPhoto = validSwatchPhoto(p.materialInfo?.swatchPhoto) ? p.materialInfo.swatchPhoto : '';
+      const nextPhoto = validSwatchPhoto(r.swatchPhoto) ? r.swatchPhoto : '';
+      rows.push(['실물 편물 사진',currentPhoto ? '등록됨' : '없음',nextPhoto ? currentPhoto === nextPhoto ? '등록됨' : '새 사진 적용' : '없음']);
+    }
     if (after.body && before.body) rows.push(['몸판 코 수',before.body.stitches+'코',after.body.stitches+'코'],['몸판 단 수',before.body.rows+'단',after.body.rows+'단'],['소매 단 수',before.sleeve.totalRows+'단',after.sleeve.totalRows+'단']);
     modal('작품에 적용할 정보 확인', `<p class="modal-description">선택한 정보는 <strong>${esc(r.name)}</strong>입니다.<br><strong>${esc(p.name)}</strong>에만 적용하고, 다른 작품의 정보는 그대로 유지해요.</p><div class="compare-scroll"><table class="version-comparison"><thead><tr><th>항목</th><th>현재</th><th>적용 후</th></tr></thead><tbody>${rows.map(([label,a,b]) => `<tr class="${a !== b ? 'different' : ''}"><th>${label}</th><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')}</tbody></table></div><div class="callout">${result.bodyChanged ? '몸판 코·단 수가 바뀌어 몸판 진도를 0단부터 기록해요. 지금의 진도는 이전 버전에 남겨둘게요.' : '몸판 코·단 수가 같아 현재 몸판 진도를 유지해요.'}${before.id !== after.id ? '<br>소매는 적용 후 설계에 저장된 진도를 불러와요. 처음 쓰는 설계라면 0단부터 시작해요.' : '<br>소매 진도도 그대로 유지해요.'}${result.revisionCleared ? '<br><strong>제작 중 실측 보정은 해제돼요.</strong> 새 조건으로 적용한 뒤 실측을 다시 입력해주세요.' : ''}${result.conditionsChanged && p.pending ? '<br>대기 중인 디자인 수정안은 취소돼요.' : ''}</div>${!result.valid ? `<p class="error-text" role="alert">${esc(result.errors.join(' '))}<br>보관함에는 저장되어 있어요. 재료의 게이지나 작품 조건을 조정한 뒤 다시 적용해주세요.</p>` : ''}`, button('back','보관함으로')+button('apply','현재 작품에 적용',r.id,'button primary',result.valid ? '' : 'disabled'), true);
   }
@@ -67,6 +144,17 @@ export function createLibraryUI({getState, project, save, modal, closeModal, ren
       switch (action.slice(4)) {
         case 'avatar': {viewedProfileId=value;const scroll=document.querySelector('#modal-root .modal')?.scrollTop||0;open();const m=document.querySelector('#modal-root .modal');m.scrollTop=scroll;m.querySelector('[data-action="lib-avatar"][aria-pressed="true"]')?.focus({preventScroll:true});break;}
         case 'add': editor(); break;
+        case 'swatch-remove': {
+          if (kind !== 'materials' || !document.getElementById('lib-swatch-preview')) break;
+          swatchRequest += 1;
+          processingSwatch = false;
+          document.getElementById('library-form').querySelectorAll('[type="submit"]').forEach(button => {button.disabled = false;});
+          editorSwatchPhoto = '';
+          document.getElementById('lib-swatch-file').value = '';
+          updateSwatchPreview();
+          document.getElementById('lib-swatch-status').textContent = '사진을 제거했어요. 재료를 저장하면 반영돼요.';
+          break;
+        }
         case 'edit': editor(value); break;
         case 'back': open(); break;
         case 'toggle': showArchived = !showArchived; open(); break;
@@ -90,7 +178,9 @@ export function createLibraryUI({getState, project, save, modal, closeModal, ren
   function submit(event) {
     if (event.target.id !== 'library-form') return false;
     event.preventDefault();
+    if (processingSwatch) {document.getElementById('library-error').textContent = '사진을 준비 중이에요. 잠시 후 저장해 주세요.';return true;}
     const data = Object.fromEntries(new FormData(event.target));
+    if (kind === 'materials') data.swatchPhoto = editorSwatchPhoto;
     for (const name of kind === 'profiles' ? ['height','chest','arm','shoulder'] : ['needle']) data[name] = Number(data[name]);
     if(kind==='materials'){Object.assign(data,readGaugeForm(event.target));for(const name of Object.keys(data))if(name.startsWith('gauge-'))delete data[name];}
     for (const [name,value] of Object.entries(data)) if (typeof value === 'string') data[name] = value.trim();

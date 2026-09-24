@@ -1,3 +1,5 @@
+import {designTextureMarkup} from './design-texture.js?v=20260924c';
+import {validSwatchPhoto} from './saved-library.js?v=20260924c';
 const angles = ['정면', '오른쪽 앞', '오른쪽 옆', '오른쪽 뒤', '뒷면', '왼쪽 뒤', '왼쪽 옆', '왼쪽 앞'];
 const sources = { base: 'assets/tryon-base.png', long: 'assets/tryon-long.png' };
 const hdSources = Object.fromEntries(['base','long'].map(variant => [variant, Array.from({length:8},(_,frame) => frame === 0
@@ -46,7 +48,8 @@ export function tryOnMarkup(p, pending) {
       <span class="tryon-drag-hint">↔ 드래그해서 돌려보세요 · 휠/두 손가락으로 확대</span>
     </div>
     <section class="tryon-texture-panel" id="tryon-texture-panel" hidden aria-label="뜨개 조직 참고 이미지">
-      <div class="tryon-texture-head"><div><strong>뜨개 조직 보기</strong><p>실제 뜨개 완성품과 현재 가상 디자인의 단품 이미지를 각각 확대해 볼 수 있어요. 서로 다른 옷이에요.</p></div><button type="button" data-tryon="texture-close" aria-label="뜨개 조직 참고 닫기">닫기</button></div>
+      <div class="tryon-texture-head"><div><strong>뜨개 조직 보기</strong><p>현재 설계에서 계산한 조직 도식과 실제 뜨개 참고 사진, AI 단품 이미지를 각각 볼 수 있어요. 사진 속 옷은 서로 다른 예시예요.</p></div><button type="button" data-tryon="texture-close" aria-label="뜨개 조직 참고 닫기">닫기</button></div>
+      ${designTextureMarkup(p, Boolean(pending))}
       <div class="tryon-real-knit"><button type="button" class="tryon-real-knit-card" data-tryon="texture-detail" data-area="real" aria-label="실제 뜨개 완성품 착용 사진 원본 확대"><img src="assets/knitted-sweater-kyle-cassidy-preview.jpg" alt="실제 아이슬란드 니트 스웨터를 입은 사람" loading="lazy" decoding="async"><span><strong>실제 뜨개 완성품 예시</strong><small>착용 사진 · 원본 3984 × 5976px<br>눌러서 원본 질감 확대</small></span></button><p>위 가상 착용 디자인과 별개의 실제 스웨터입니다.</p><p class="tryon-real-knit-credit">사진: Kyle Cassidy · <a href="https://commons.wikimedia.org/wiki/File:Knitted_Sweater.jpg" target="_blank" rel="noopener noreferrer">원본 · Wikimedia Commons</a> · <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a><br>원본은 편집하지 않았으며 미리보기만 축소·일부 표시했습니다.</p><button type="button" class="tryon-real-knit-card tryon-real-knit-card--macro" data-tryon="texture-detail" data-area="real-close" aria-label="실제 손뜨개 스웨터 조직 사진 원본 확대"><img src="assets/blue-gray-hand-knit-texture-preview.jpg" alt="실제 손뜨개 스웨터의 회청색 실과 뜨개 코를 가까이 찍은 사진" loading="lazy" decoding="async"><span><strong>실제 손뜨개 조직 확대</strong><small>스웨터 근접 사진 · 원본 3000 × 2000px<br>실과 코 모양 자세히 보기</small></span></button><p>위 착용 사진과도 별개의 손뜨개 스웨터입니다.</p><p class="tryon-real-knit-credit">사진: Photos Public Domain · <a href="https://commons.wikimedia.org/wiki/File:Blue_Gray_knit_texture.jpg" target="_blank" rel="noopener noreferrer">원본 · Wikimedia Commons</a> · 퍼블릭 도메인<br>원본은 편집하지 않았으며 미리보기만 축소·일부 표시했습니다.</p></div>
       <div class="tryon-ai-knit"><strong>현재 가상 디자인의 단품 참고</strong><p>아래 이미지는 AI로 만든 스웨터예요. 실제 완성품 사진과 별개입니다.</p><div class="tryon-texture-samples"><button type="button" class="tryon-texture-card" data-tryon="texture-detail" data-area="body"><span class="tryon-texture-crop tryon-texture-body" aria-hidden="true"></span><span>몸판 조직 자세히 보기</span></button><button type="button" class="tryon-texture-card" data-tryon="texture-detail" data-area="cuff"><span class="tryon-texture-crop tryon-texture-cuff" aria-hidden="true"></span><span>소매 끝 시보리 자세히 보기</span></button></div></div>
     </section>
@@ -59,14 +62,15 @@ export function tryOnMarkup(p, pending) {
     </dialog>
     <div class="tryon-rotation"><button data-tryon="prev" aria-label="이전 각도">‹</button><button data-tryon="play" aria-label="자동 회전 시작" aria-pressed="false">▷</button><input type="range" min="0" max="7" step="1" value="0" aria-label="착용 이미지 회전 각도"><output class="tryon-angle" aria-live="polite">정면 · 0°</output><button data-tryon="next" aria-label="다음 각도">›</button></div>
     <div class="tryon-directions" role="group" aria-label="방향 바로 보기">${[[0,'앞'],[2,'오른쪽'],[4,'뒤'],[6,'왼쪽']].map(([n,label])=>`<button data-tryon="angle" data-angle="${n}" aria-pressed="${n===0}">${label}</button>`).join('')}<button data-tryon="reset">보기 초기화</button></div>
-    <div class="tryon-selection"><div><span class="tryon-state">${pending ? '수정안 · 아직 적용 전' : compatible ? '현재 디자인' : '기본 디자인 참고 이미지'}</span><strong class="tryon-selection-title"></strong><p class="tryon-selection-description"></p></div><button class="button primary small" data-tryon="propose">이 소매로 수정안 만들기</button></div>
+    <div class="tryon-selection"><div><span class="tryon-state">${pending ? '수정안 확인 중 · 기본 모델 참고' : '기본 모델 참고 이미지'}</span><strong class="tryon-selection-title"></strong><p class="tryon-selection-description"></p></div><button class="button primary small" data-tryon="propose">이 소매로 수정안 만들기</button></div>
+    <p class="tryon-scope-note">이 착용 사진은 미리 만든 연출 예시예요. 선택한 착용자 치수와 손땀 게이지, 실제 완성 핏은 반영하지 않아요.</p>
     ${compatible ? '' : '<div class="tryon-mismatch">현재 변경한 설계는 이 착용 이미지에 반영되지 않아요. <button data-action="preview-3d">도안 연동 360°에서 확인 →</button></div>'}
     <div class="tryon-disclosure"><span>기본 모델 참고 이미지 · 아래 계산값은 도안 연동 360°에 반영</span><button class="quiet-link" data-action="tryon-guide">착용 안내</button></div>
   </div>`;
 }
 
 export function createTryOn(root, options) {
-  const { ui, sleeve, pending, onPropose } = options;
+  const { ui, sleeve, pending, onPropose, swatchPhoto } = options;
   const canvas = root.querySelector('canvas'), ctx = canvas.getContext('2d');
   const viewport = root.querySelector('.tryon-viewport');
   const abort = new AbortController(), signal = abort.signal;
@@ -256,11 +260,12 @@ export function createTryOn(root, options) {
     body: {src:'assets/sweater.png', title:'몸판 조직', note:'착용 사진과 별개의 AI 제작 스웨터 단품 참고 이미지예요.', alt:'연보라색 스웨터 몸판과 주황색 시보리의 뜨개 조직', focus:{x:.5,y:.52}},
     cuff: {src:'assets/sweater.png', title:'소매 끝 시보리 조직', note:'착용 사진과 별개의 AI 제작 스웨터 단품 참고 이미지예요.', alt:'연보라색 스웨터의 주황색 소매 끝 시보리 조직', focus:{x:.11,y:.8}},
     real: {src:'assets/knitted-sweater-kyle-cassidy.jpg', title:'실제 뜨개 완성품', note:'현재 가상 착용 디자인과 다른 실제 아이슬란드 니트 스웨터 착용 사진입니다. 원본 3984 × 5976px.', alt:'실제 아이슬란드 니트 스웨터를 입은 사람. 원본 사진'},
-    'real-close': {src:'assets/blue-gray-hand-knit-texture.jpg', title:'실제 손뜨개 스웨터 조직', note:'가상 디자인 및 위 착용 사진과 별개인 손뜨개 스웨터의 근접 사진입니다. 원본 3000 × 2000px.', alt:'실제 손뜨개 스웨터의 회청색 실과 뜨개 코를 가까이 찍은 원본 사진'}
+    'real-close': {src:'assets/blue-gray-hand-knit-texture.jpg', title:'실제 손뜨개 스웨터 조직', note:'가상 디자인 및 위 착용 사진과 별개인 손뜨개 스웨터의 근접 사진입니다. 원본 3000 × 2000px.', alt:'실제 손뜨개 스웨터의 회청색 실과 뜨개 코를 가까이 찍은 원본 사진'},
+    ...(validSwatchPhoto(swatchPhoto) ? {swatch:{src:swatchPhoto, title:'내 실물 편물 견본', note:'현재 작품에 적용한 재료 사진입니다. 실제 실 결·색의 참고 자료이며 완성옷의 형태나 착용감을 예측하지 않습니다.', alt:'사용자가 올린 실제 편물 견본 사진'}} : {})
   };
   let textureArea = 'body', textureZoom = 1, textureX = 0, textureY = 0, textureTrigger = null, textureDrag = null, texturePinch = null, textureFitted = false;
   function textureZoomStops() {
-    if (!textureArea.startsWith('real') || !textureImage.naturalWidth) return [.5, .75, 1, 1.5, 2];
+    if (!(textureArea.startsWith('real') || textureArea === 'swatch') || !textureImage.naturalWidth) return [.5, .75, 1, 1.5, 2];
     const fit = Math.min(textureViewport.clientWidth / textureImage.naturalWidth, textureViewport.clientHeight / textureImage.naturalHeight);
     return [fit, .25, .5, .75, 1].filter((stop, index, list) => stop >= fit - .001 && list.findIndex(value => Math.abs(value - stop) < .001) === index).sort((a,b) => a-b);
   }
@@ -282,7 +287,7 @@ export function createTryOn(root, options) {
     textureImage.style.transform = 'translate3d(' + textureX + 'px,' + textureY + 'px,0) scale(' + textureZoom + ')';
   }
   function resetTextureDetail() {
-    textureFitted = textureArea.startsWith('real');
+    textureFitted = (textureArea.startsWith('real') || textureArea === 'swatch');
     textureZoom = textureFitted && textureImage.naturalWidth ? textureZoomStops()[0] : 1;
     if (textureImage.naturalWidth) {
       if (textureFitted) {
@@ -321,10 +326,10 @@ export function createTryOn(root, options) {
     const source = textureSources[textureArea];
     textureDialog.querySelector('#tryon-texture-detail-title').textContent = source.title;
     textureDialog.querySelector('#tryon-texture-detail-note').textContent = source.note;
-    textureDialog.querySelector('[data-tryon="texture-detail-reset"]').textContent = textureArea.startsWith('real') ? '전체 보기' : '원래 보기';
+    textureDialog.querySelector('[data-tryon="texture-detail-reset"]').textContent = (textureArea.startsWith('real') || textureArea === 'swatch') ? '전체 보기' : '원래 보기';
     textureCredits.forEach(credit => { credit.hidden = credit.dataset.credit !== textureArea; });
     textureImage.alt = source.alt;
-    textureLoading.textContent = textureArea.startsWith('real') ? '고해상도 사진을 불러오는 중이에요…' : '이미지를 불러오는 중이에요…';
+    textureLoading.textContent = (textureArea.startsWith('real') || textureArea === 'swatch') ? '고해상도 사진을 불러오는 중이에요…' : '이미지를 불러오는 중이에요…';
     textureLoading.hidden = false;
     textureDialog.showModal();
     if (textureImage.getAttribute('src') !== source.src) textureImage.src = source.src;
@@ -412,7 +417,7 @@ export function createTryOn(root, options) {
   });
   const textureObserver = new ResizeObserver(() => {
     if (!textureDialog.open) return;
-    if (textureArea.startsWith('real') && textureFitted) resetTextureDetail();
+    if ((textureArea.startsWith('real') || textureArea === 'swatch') && textureFitted) resetTextureDetail();
     else {clampTexturePan(); renderTextureDetail();}
   });
   textureObserver.observe(textureViewport);

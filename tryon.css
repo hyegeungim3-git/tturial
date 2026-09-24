@@ -91,3 +91,4 @@
 .tryon-real-knit-card:focus-visible,.tryon-real-knit-credit a:focus-visible,.tryon-texture-detail-credit a:focus-visible{outline:3px solid #a494e1;outline-offset:2px}
 @media(max-width:420px){.tryon-real-knit-card img{width:96px;height:130px}.tryon-real-knit-card{gap:9px}.tryon-real-knit-card strong{font-size:13px}.tryon-real-knit-card small{font-size:11px}}
 .tryon-real-knit-card--macro{margin-top:12px}.tryon-real-knit-card--macro img{height:112px;object-position:center}
+.tryon-scope-note{margin:0 0 7px;padding:8px 10px;border-radius:6px;background:#f7f5fa;color:#756b80;font-size:12px;line-height:1.65}

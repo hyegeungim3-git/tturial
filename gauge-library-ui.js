@@ -1,4 +1,4 @@
-import {GAUGE_STAGES,activeGaugeStage,gaugeReadings,gaugeDifference} from './saved-library.js';
+import {GAUGE_STAGES,activeGaugeStage,gaugeReadings,gaugeDifference} from './saved-library.js?v=20260924c';
 
 export function gaugeComparison(r) {
   const delta=gaugeDifference(r);

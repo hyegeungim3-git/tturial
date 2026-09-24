@@ -1,4 +1,4 @@
-import {parseBackup, backupSummary, commitBackup, RECOVERY_KEY, MAX_BACKUP_BYTES} from './backup.js';
+import {parseBackup, backupSummary, commitBackup, RECOVERY_KEY, MAX_BACKUP_BYTES} from './backup.js?v=20260924c';
 
 export function createBackupUI({getState, applyState, modal, closeModal, toast, esc}) {
   let draft = null;

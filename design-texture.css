@@ -1,0 +1,24 @@
+.design-texture{margin-top:13px;padding:13px;border:1px solid #cfc3dc;border-radius:10px;background:#fff;color:#534364}
+.design-texture-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.design-texture-heading strong{display:block;font-size:14px;line-height:1.4}
+.design-texture-kicker{display:block;margin-bottom:3px;color:#8b759c;font-size:10px;font-weight:700;letter-spacing:1.3px}
+.design-texture-draft{flex:none;padding:4px 7px;border-radius:5px;background:#fff3e3;color:#835d2f;font-size:11px}
+.design-texture-intro,.design-texture-limit,.design-texture>p{margin:7px 0 0;color:#766b7e;font-size:12px;line-height:1.6}
+.design-texture-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.design-texture-sample{min-width:0;overflow:hidden;border:1px solid #e7e0eb;border-radius:8px;background:#faf9fb}
+.design-texture-visual{display:flex;align-items:center;justify-content:center;height:154px;overflow:hidden;background:#f8f5fa}
+.design-texture-svg{display:block;width:100%;height:100%}
+.design-texture-svg--rib{height:auto;max-height:100%}
+.design-texture-copy{display:grid;gap:4px;padding:9px 10px 10px;font-size:12px;line-height:1.5}
+.design-texture-copy strong{font-size:13px;color:#51405f}
+.design-texture-copy span{color:#62546d}
+.design-texture-copy small{color:#807389;font-size:11px}
+.design-texture-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;margin-top:10px;color:#6d6078;font-size:11px;line-height:1.5}
+.design-texture-meta strong{font-weight:700;font-variant-numeric:tabular-nums}
+.design-texture-limit{padding-top:8px;border-top:1px solid #eee9f0}
+@media(max-width:470px){.design-texture-grid{grid-template-columns:1fr}.design-texture-visual{height:145px}}
+
+.design-texture-sample--photo{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);width:100%;padding:0;text-align:left;font:inherit;cursor:zoom-in}
+.design-texture-sample--photo:hover{border-color:#b8a7c9;background:#f7f3fa}
+.design-texture-photo{display:block;width:100%;height:100%;object-fit:cover}
+@media(max-width:470px){.design-texture-sample--photo{grid-template-columns:1fr}}

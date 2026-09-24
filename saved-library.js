@@ -18,7 +18,14 @@ export function gaugeDifference(r) {
   // Same stitch/row count: physical dimension is inversely proportional to gauge.
   return {stitches:after.stitches-before.stitches,rows:after.rows-before.rows,widthPercent:(before.stitches/after.stitches-1)*100,lengthPercent:(before.rows/after.rows-1)*100};
 }
-export const materialInfo = r => ({name:r.name, brand:r.brand || '', colorLabel:r.colorLabel || '', lot:r.lot || '', note:r.note || '',gaugeReadings:gaugeReadings(r),activeGaugeStage:activeGaugeStage(r)});
+export const MAX_SWATCH_PHOTO_BYTES = 240 * 1024;
+export function validSwatchPhoto(value) {
+  if (typeof value !== 'string' || value.length > 330000) return false;
+  const encoded = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(value)?.[1];
+  if (!encoded || encoded.length % 4 !== 0) return false;
+  return encoded.length / 4 * 3 - (encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0) <= MAX_SWATCH_PHOTO_BYTES;
+}
+export const materialInfo = r => ({name:r.name, brand:r.brand || '', colorLabel:r.colorLabel || '', lot:r.lot || '', note:r.note || '',gaugeReadings:gaugeReadings(r),activeGaugeStage:activeGaugeStage(r),...(validSwatchPhoto(r.swatchPhoto) ? {swatchPhoto:r.swatchPhoto} : {})});
 const materialValues = r => ({material:r.material, ...gaugeValues(r)});
 const fromProject = p => ({name:p.materialInfo?.name || `${p.design.material} · ${p.gauge.needle || p.design.needle}mm`, material:p.design.material, ...p.gauge, needle:p.gauge.needle || p.design.needle, ...p.materialInfo});
 const key = kind => kind === 'profiles' ? 'defaultProfileId' : 'defaultMaterialId';
@@ -63,6 +70,7 @@ export function validateRecord(kind, r) {
     : [['코 수',r.stitches,5,60],['단 수',r.rows,5,80],['바늘 굵기',r.needle,1,15]];
   for (const [label, value, min, max] of ranges) if (!Number.isFinite(value) || value < min || value > max) errors.push(`${label}는 ${min}–${max} 범위로 입력해주세요.`);
   if (kind === 'materials') {
+    if (r.swatchPhoto != null && r.swatchPhoto !== '' && !validSwatchPhoto(r.swatchPhoto)) errors.push('편물 사진 형식이나 용량을 확인해주세요. 사진을 다시 선택해 주세요.');
     if (!String(r.material || '').trim() || r.material.length > 80) errors.push('실의 소재를 80자 이내로 적어주세요.');
     if (!['measured','reference'].includes(r.source)) errors.push('게이지 측정 상태를 골라주세요.');
     const readings = gaugeReadings(r), stage = activeGaugeStage(r);
@@ -80,6 +88,7 @@ export function validateRecord(kind, r) {
 
 export function saveRecord(state, kind, values, recordId) {
   values = kind === 'materials' ? resolveGaugeRecord(values) : {...values};
+  if (kind === 'materials' && !values.swatchPhoto) delete values.swatchPhoto;
   if (kind === 'profiles') delete values.level;
   const errors = validateRecord(kind, values);
   if (errors.length) throw new Error(errors.join(' '));

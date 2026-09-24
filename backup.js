@@ -1,4 +1,4 @@
-import {ensureLibraries} from './saved-library.js';
+import {ensureLibraries} from './saved-library.js?v=20260924c';
 import {compileDesign} from './design-engine.js';
 
 export const STORAGE_KEY = 'hanol-prototype-v1';
