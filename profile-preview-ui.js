@@ -17,7 +17,7 @@ export function createProfilePreview(esc) {
     if(!target || !profile){target?.setAttribute('aria-busy','false');return;}
     lastProfile={...profile};updateLabels(profile);
     try {
-      const {createProfileAvatar}=await import('./profile-avatar.js');
+      const {createProfileAvatar}=await import('./profile-avatar.js?v=20260926a');
       if(token !== generation || !target.isConnected)return;
       viewer=createProfileAvatar(target,lastProfile);
       target.setAttribute('aria-busy','false');

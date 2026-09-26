@@ -1,6 +1,6 @@
 import {activeGaugeStage, GAUGE_STAGES, activeRecords, saveRecord, setDefault, archiveRecord, matchesProject, prepareSelection, applySelection, validSwatchPhoto} from './saved-library.js?v=20260924c';
 
-import {createProfilePreview} from './profile-preview-ui.js';
+import {createProfilePreview} from './profile-preview-ui.js?v=20260926a';
 import {gaugeCard,gaugeEditor,readGaugeForm,updateGaugeComparison} from './gauge-library-ui.js?v=20260924c';
 
 const SWATCH_INPUT_LIMIT = 12 * 1024 * 1024;
